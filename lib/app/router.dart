@@ -1,0 +1,69 @@
+import 'package:coffee_journal/features/coffees/coffee_form_screen.dart';
+import 'package:coffee_journal/features/coffees/coffee_list_screen.dart';
+import 'package:coffee_journal/features/entries/entry_detail_screen.dart';
+import 'package:coffee_journal/features/entries/entry_form_screen.dart';
+import 'package:coffee_journal/features/entries/entry_list_screen.dart';
+import 'package:coffee_journal/features/settings/settings_screen.dart';
+import 'package:coffee_journal/features/templates/templates_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+final appRouter = GoRouter(
+  routes: [
+    GoRoute(
+      path: '/',
+      builder: (context, state) => const CoffeeListScreen(),
+      routes: [
+        GoRoute(
+          path: 'coffee/new',
+          builder: (context, state) => const CoffeeFormScreen(),
+        ),
+        GoRoute(
+          path: 'coffee/:coffeeId/edit',
+          builder: (context, state) => CoffeeFormScreen(
+            coffeeId: state.pathParameters['coffeeId'],
+          ),
+        ),
+        GoRoute(
+          path: 'coffee/:coffeeId',
+          builder: (context, state) => EntryListScreen(
+            coffeeId: state.pathParameters['coffeeId']!,
+          ),
+          routes: [
+            GoRoute(
+              path: 'entry/new',
+              builder: (context, state) => EntryFormScreen(
+                coffeeId: state.pathParameters['coffeeId']!,
+                duplicateFromEntryId: state.uri.queryParameters['duplicateFrom'],
+              ),
+            ),
+            GoRoute(
+              path: 'entry/:entryId/edit',
+              builder: (context, state) => EntryFormScreen(
+                coffeeId: state.pathParameters['coffeeId']!,
+                entryId: state.pathParameters['entryId']!,
+              ),
+            ),
+          ],
+        ),
+        GoRoute(
+          path: 'entry/:entryId',
+          builder: (context, state) =>
+              EntryDetailScreen(entryId: state.pathParameters['entryId']!),
+        ),
+        GoRoute(
+          path: 'templates',
+          builder: (context, state) => const TemplatesScreen(),
+        ),
+        GoRoute(
+          path: 'settings',
+          builder: (context, state) => const SettingsScreen(),
+        ),
+      ],
+    ),
+  ],
+  errorBuilder: (context, state) => Scaffold(
+    appBar: AppBar(title: const Text('Not found')),
+    body: Center(child: Text(state.error.toString())),
+  ),
+);

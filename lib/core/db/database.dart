@@ -1,0 +1,234 @@
+import 'dart:io';
+
+import 'package:drift/drift.dart';
+import 'package:drift/native.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+
+part 'database.g.dart';
+
+class Coffees extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  TextColumn get roaster => text()();
+  TextColumn get country => text().nullable()();
+  TextColumn get region => text().nullable()();
+  TextColumn get farm => text().nullable()();
+  TextColumn get producer => text().nullable()();
+  TextColumn get varietal => text().nullable()();
+  TextColumn get process => text().nullable()();
+  RealColumn get altitudeM => real().nullable()();
+  DateTimeColumn get roastDate => dateTime().nullable()();
+  TextColumn get tastingNotes => text().nullable()();
+  BoolColumn get isArchived => boolean().withDefault(const Constant(false))();
+  TextColumn get searchText => text().withDefault(const Constant(''))();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class Entries extends Table {
+  TextColumn get id => text()();
+  TextColumn get coffeeId =>
+      text().references(Coffees, #id, onDelete: KeyAction.cascade)();
+  DateTimeColumn get brewAt => dateTime()();
+  TextColumn get brewMethod => text()();
+  BoolColumn get isStarred => boolean().withDefault(const Constant(false))();
+
+  RealColumn get coffeeDoseG => real()();
+  RealColumn get waterTotalG => real()();
+  RealColumn get waterTempC => real().nullable()();
+  TextColumn get grinder => text().nullable()();
+  TextColumn get grindSetting => text().nullable()();
+
+  RealColumn get yieldG => real().nullable()();
+  RealColumn get pressureBar => real().nullable()();
+  IntColumn get preinfusionSec => integer().nullable()();
+
+  IntColumn get brewTimeSecAuto => integer().withDefault(const Constant(0))();
+  IntColumn get brewTimeSecManual => integer().nullable()();
+
+  TextColumn get sensoryJson => text().nullable()();
+  TextColumn get dialInNotes => text().nullable()();
+  TextColumn get miscNotes => text().nullable()();
+
+  TextColumn get agitationLevel => text().nullable()();
+  IntColumn get drawdownSec => integer().nullable()();
+  TextColumn get extractionOutcome =>
+      text().withDefault(const Constant('unknown'))();
+
+  TextColumn get searchText => text().withDefault(const Constant(''))();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class EntrySteps extends Table {
+  TextColumn get id => text()();
+  TextColumn get entryId =>
+      text().references(Entries, #id, onDelete: KeyAction.cascade)();
+  IntColumn get stepIndex => integer()();
+  TextColumn get type => text()();
+  IntColumn get startSec => integer().nullable()();
+  IntColumn get durationSec => integer().nullable()();
+  TextColumn get note => text().nullable()();
+  RealColumn get waterG => real().nullable()();
+  RealColumn get flowRateGPerSec => real().nullable()();
+  RealColumn get pressureBar => real().nullable()();
+  IntColumn get count => integer().nullable()();
+  TextColumn get tool => text().nullable()();
+  TextColumn get label => text().nullable()();
+  TextColumn get jsonPayload => text().nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class Templates extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  TextColumn get scope => text()();
+  TextColumn get coffeeId =>
+      text().nullable().references(Coffees, #id, onDelete: KeyAction.cascade)();
+  TextColumn get brewMethod => text()();
+  RealColumn get defaultCoffeeDoseG => real().nullable()();
+  RealColumn get defaultWaterTotalG => real().nullable()();
+  TextColumn get searchText => text().withDefault(const Constant(''))();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class TemplateSteps extends Table {
+  TextColumn get id => text()();
+  TextColumn get templateId =>
+      text().references(Templates, #id, onDelete: KeyAction.cascade)();
+  IntColumn get stepIndex => integer()();
+  TextColumn get type => text()();
+  IntColumn get startSec => integer().nullable()();
+  IntColumn get durationSec => integer().nullable()();
+  TextColumn get note => text().nullable()();
+  RealColumn get waterG => real().nullable()();
+  RealColumn get flowRateGPerSec => real().nullable()();
+  RealColumn get pressureBar => real().nullable()();
+  IntColumn get count => integer().nullable()();
+  TextColumn get tool => text().nullable()();
+  TextColumn get label => text().nullable()();
+  TextColumn get jsonPayload => text().nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class Tags extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  TextColumn get normalizedName => text().unique()();
+  IntColumn get usageCount => integer().withDefault(const Constant(0))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class CoffeeTags extends Table {
+  TextColumn get coffeeId =>
+      text().references(Coffees, #id, onDelete: KeyAction.cascade)();
+  TextColumn get tagId => text().references(Tags, #id, onDelete: KeyAction.cascade)();
+
+  @override
+  Set<Column<Object>> get primaryKey => {coffeeId, tagId};
+}
+
+class EntryTags extends Table {
+  TextColumn get entryId =>
+      text().references(Entries, #id, onDelete: KeyAction.cascade)();
+  TextColumn get tagId => text().references(Tags, #id, onDelete: KeyAction.cascade)();
+
+  @override
+  Set<Column<Object>> get primaryKey => {entryId, tagId};
+}
+
+class TemplateTags extends Table {
+  TextColumn get templateId =>
+      text().references(Templates, #id, onDelete: KeyAction.cascade)();
+  TextColumn get tagId => text().references(Tags, #id, onDelete: KeyAction.cascade)();
+
+  @override
+  Set<Column<Object>> get primaryKey => {templateId, tagId};
+}
+
+class AppSettings extends Table {
+  TextColumn get key => text()();
+  TextColumn get value => text()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {key};
+}
+
+@DriftDatabase(
+  tables: [
+    Coffees,
+    Entries,
+    EntrySteps,
+    Templates,
+    TemplateSteps,
+    Tags,
+    CoffeeTags,
+    EntryTags,
+    TemplateTags,
+    AppSettings,
+  ],
+)
+class AppDatabase extends _$AppDatabase {
+  AppDatabase() : super(_openConnection());
+
+  AppDatabase.forTesting(super.e);
+
+  @override
+  int get schemaVersion => 1;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        onCreate: (m) async {
+          await m.createAll();
+          await customStatement(
+            'CREATE INDEX idx_entries_coffee_brew_at ON entries (coffee_id, brew_at DESC);',
+          );
+          await customStatement(
+            'CREATE INDEX idx_entries_coffee_star_brew ON entries (coffee_id, is_starred DESC, brew_at DESC);',
+          );
+          await customStatement('CREATE INDEX idx_coffees_roaster ON coffees (roaster);');
+          await customStatement('CREATE INDEX idx_coffees_country ON coffees (country);');
+          await customStatement('CREATE INDEX idx_coffees_name ON coffees (name);');
+          await customStatement(
+            'CREATE INDEX idx_entry_steps_entry_step ON entry_steps (entry_id, step_index);',
+          );
+        },
+      );
+
+  Future<void> upsertSetting(String key, String value) {
+    return into(appSettings).insertOnConflictUpdate(
+      AppSettingsCompanion(key: Value(key), value: Value(value)),
+    );
+  }
+
+  Future<String?> getSetting(String key) async {
+    final row = await (select(appSettings)..where((tbl) => tbl.key.equals(key)))
+        .getSingleOrNull();
+    return row?.value;
+  }
+}
+
+LazyDatabase _openConnection() {
+  return LazyDatabase(() async {
+    final dir = await getApplicationDocumentsDirectory();
+    final file = File(p.join(dir.path, 'coffee_journal.sqlite'));
+    return NativeDatabase.createInBackground(file);
+  });
+}

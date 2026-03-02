@@ -1,0 +1,163 @@
+import 'package:coffee_journal/core/db/database.dart';
+import 'package:coffee_journal/core/models/enums.dart';
+import 'package:coffee_journal/core/models/recipe_step_draft.dart';
+
+class CoffeeRecord {
+  const CoffeeRecord({required this.coffee, required this.tags});
+
+  final Coffee coffee;
+  final List<String> tags;
+}
+
+class EntryRecord {
+  const EntryRecord({
+    required this.entry,
+    required this.steps,
+    required this.tags,
+  });
+
+  final Entry entry;
+  final List<EntryStep> steps;
+  final List<String> tags;
+}
+
+class TemplateRecord {
+  const TemplateRecord({
+    required this.template,
+    required this.steps,
+    required this.tags,
+  });
+
+  final Template template;
+  final List<TemplateStep> steps;
+  final List<String> tags;
+}
+
+class EntryFilter {
+  const EntryFilter({
+    this.method,
+    this.starredOnly = false,
+    this.tag,
+    this.start,
+    this.end,
+  });
+
+  final BrewMethod? method;
+  final bool starredOnly;
+  final String? tag;
+  final DateTime? start;
+  final DateTime? end;
+}
+
+abstract class CoffeeRepository {
+  Future<List<CoffeeRecord>> list({
+    String query,
+    CoffeeSortOption sort,
+  });
+
+  Future<CoffeeRecord?> getById(String id);
+
+  Future<void> upsert({
+    String? id,
+    required String name,
+    required String roaster,
+    String? country,
+    String? region,
+    String? farm,
+    String? producer,
+    String? varietal,
+    String? process,
+    double? altitudeM,
+    DateTime? roastDate,
+    String? tastingNotes,
+    List<String> tags,
+    bool isArchived,
+  });
+
+  Future<void> delete(String id);
+}
+
+abstract class EntryRepository {
+  Future<List<EntryRecord>> listForCoffee(
+    String coffeeId, {
+    EntrySortOption sort,
+    EntryFilter filter,
+  });
+
+  Future<EntryRecord?> getById(String id);
+
+  Future<void> upsert({
+    String? id,
+    required String coffeeId,
+    required DateTime brewAt,
+    required BrewMethod brewMethod,
+    required bool isStarred,
+    required double coffeeDoseG,
+    required double waterTotalG,
+    double? waterTempC,
+    String? grinder,
+    String? grindSetting,
+    double? yieldG,
+    double? pressureBar,
+    int? preinfusionSec,
+    required int brewTimeSecAuto,
+    int? brewTimeSecManual,
+    String? sensoryJson,
+    String? dialInNotes,
+    String? miscNotes,
+    String? agitationLevel,
+    int? drawdownSec,
+    required ExtractionOutcome extractionOutcome,
+    required List<RecipeStepDraft> steps,
+    List<String> tags,
+  });
+
+  Future<void> duplicateEntryToNewDay(String entryId, DateTime newDate);
+
+  Future<void> delete(String id);
+}
+
+abstract class TemplateRepository {
+  Future<List<TemplateRecord>> list({String? coffeeId});
+
+  Future<void> upsert({
+    String? id,
+    required String name,
+    required TemplateScope scope,
+    String? coffeeId,
+    required BrewMethod brewMethod,
+    double? defaultCoffeeDoseG,
+    double? defaultWaterTotalG,
+    required List<RecipeStepDraft> steps,
+    List<String> tags,
+  });
+
+  Future<void> delete(String id);
+}
+
+abstract class BackupRepository {
+  Future<Map<String, dynamic>> exportBundle();
+  Future<ImportPreview> previewImport(Map<String, dynamic> payload);
+  Future<void> importBundle(Map<String, dynamic> payload);
+}
+
+class ImportPreview {
+  const ImportPreview({
+    required this.coffeeCount,
+    required this.entryCount,
+    required this.templateCount,
+    required this.tagCount,
+    required this.conflictCount,
+  });
+
+  final int coffeeCount;
+  final int entryCount;
+  final int templateCount;
+  final int tagCount;
+  final int conflictCount;
+}
+
+abstract class SettingsRepository {
+  Future<UnitSystem> getUnitSystem();
+  Future<void> setUnitSystem(UnitSystem unitSystem);
+}
