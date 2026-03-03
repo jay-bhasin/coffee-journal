@@ -17,7 +17,7 @@ class Coffees extends Table {
   TextColumn get producer => text().nullable()();
   TextColumn get varietal => text().nullable()();
   TextColumn get process => text().nullable()();
-  RealColumn get altitudeM => real().nullable()();
+  TextColumn get altitudeM => text().named('altitude_m').nullable()();
   DateTimeColumn get roastDate => dateTime().nullable()();
   TextColumn get tastingNotes => text().nullable()();
   BoolColumn get isArchived => boolean().withDefault(const Constant(false))();
@@ -203,7 +203,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -228,6 +228,9 @@ class AppDatabase extends _$AppDatabase {
             await m.createTable(brewMethods);
             await _seedDefaultBrewMethods();
             await _migrateLegacyBrewMethodNames();
+          }
+          if (from < 3) {
+            await _migrateCoffeeAltitudeToText();
           }
         },
       );
@@ -292,6 +295,47 @@ class AppDatabase extends _$AppDatabase {
         [entry.value, entry.key],
       );
     }
+  }
+
+  Future<void> _migrateCoffeeAltitudeToText() async {
+    await customStatement('PRAGMA foreign_keys = OFF;');
+    await customStatement('''
+      CREATE TABLE coffees_new (
+        id TEXT NOT NULL PRIMARY KEY,
+        name TEXT NOT NULL,
+        roaster TEXT NOT NULL,
+        country TEXT NULL,
+        region TEXT NULL,
+        farm TEXT NULL,
+        producer TEXT NULL,
+        varietal TEXT NULL,
+        process TEXT NULL,
+        altitude_m TEXT NULL,
+        roast_date INTEGER NULL,
+        tasting_notes TEXT NULL,
+        is_archived INTEGER NOT NULL DEFAULT 0,
+        search_text TEXT NOT NULL DEFAULT '',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+    ''');
+    await customStatement('''
+      INSERT INTO coffees_new (
+        id, name, roaster, country, region, farm, producer, varietal, process,
+        altitude_m, roast_date, tasting_notes, is_archived, search_text, created_at, updated_at
+      )
+      SELECT
+        id, name, roaster, country, region, farm, producer, varietal, process,
+        CASE WHEN altitude_m IS NULL THEN NULL ELSE CAST(altitude_m AS TEXT) END,
+        roast_date, tasting_notes, is_archived, search_text, created_at, updated_at
+      FROM coffees;
+    ''');
+    await customStatement('DROP TABLE coffees;');
+    await customStatement('ALTER TABLE coffees_new RENAME TO coffees;');
+    await customStatement('CREATE INDEX IF NOT EXISTS idx_coffees_roaster ON coffees (roaster);');
+    await customStatement('CREATE INDEX IF NOT EXISTS idx_coffees_country ON coffees (country);');
+    await customStatement('CREATE INDEX IF NOT EXISTS idx_coffees_name ON coffees (name);');
+    await customStatement('PRAGMA foreign_keys = ON;');
   }
 }
 

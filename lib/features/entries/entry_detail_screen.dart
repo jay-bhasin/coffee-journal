@@ -110,23 +110,38 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
                       if (mounted) setState(() => _refreshToken++);
                       break;
                     case 'create_template':
-                      final defaultName = '${entry.brewMethod} ${DateFormat.yMMMd().format(entry.brewAt)}';
-                      final name = await _promptTemplateName(context, defaultName);
-                      if (name == null || name.trim().isEmpty) break;
-                      await templateRepository.upsert(
-                        name: name.trim(),
-                        scope: TemplateScope.global,
-                        coffeeId: null,
-                        brewMethod: entry.brewMethod,
-                        defaultCoffeeDoseG: entry.coffeeDoseG,
-                        defaultWaterTotalG: entry.waterTotalG,
-                        steps: _stepsToDrafts(item.steps),
-                        tags: item.tags,
-                      );
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Template created')),
+                      try {
+                        final defaultName = '${entry.brewMethod} ${DateFormat.yMMMd().format(entry.brewAt)}';
+                        final name = await _promptTemplateName(context, defaultName);
+                        if (name == null || name.trim().isEmpty) break;
+                        final tags = item.tags
+                            .map((e) => e.trim())
+                            .where((e) => e.isNotEmpty)
+                            .toSet()
+                            .toList(growable: false);
+                        await templateRepository.upsert(
+                          name: name.trim(),
+                          scope: TemplateScope.global,
+                          coffeeId: null,
+                          brewMethod: entry.brewMethod,
+                          defaultCoffeeDoseG: entry.coffeeDoseG,
+                          defaultWaterTotalG: entry.waterTotalG,
+                          steps: _stepsToDrafts(item.steps),
+                          tags: tags,
                         );
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Template created')),
+                          );
+                        }
+                      } catch (error, stackTrace) {
+                        debugPrint('Create template failed: $error');
+                        debugPrintStack(stackTrace: stackTrace);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Template creation failed: $error')),
+                          );
+                        }
                       }
                       break;
                     case 'delete':
@@ -276,15 +291,16 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
   }
 
   Future<String?> _promptTemplateName(BuildContext context, String initialName) async {
-    final controller = TextEditingController(text: initialName);
+    var draftName = initialName;
     final value = await showDialog<String>(
       context: context,
       builder: (context) {
         return AlertDialog(
           title: const Text('Template name'),
-          content: TextField(
-            controller: controller,
+          content: TextFormField(
+            initialValue: initialName,
             autofocus: true,
+            onChanged: (value) => draftName = value,
             decoration: const InputDecoration(labelText: 'Name'),
           ),
           actions: [
@@ -293,14 +309,13 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed: () => Navigator.of(context).pop(controller.text),
+              onPressed: () => Navigator.of(context).pop(draftName),
               child: const Text('Create'),
             ),
           ],
         );
       },
     );
-    controller.dispose();
     return value;
   }
 

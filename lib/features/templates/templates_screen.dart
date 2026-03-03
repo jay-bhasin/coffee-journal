@@ -1,9 +1,9 @@
 import 'package:coffee_journal/core/db/database_provider.dart';
 import 'package:coffee_journal/core/models/enums.dart';
-import 'package:coffee_journal/core/models/recipe_step_draft.dart';
 import 'package:coffee_journal/core/repositories/contracts.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 class TemplatesScreen extends ConsumerStatefulWidget {
   const TemplatesScreen({super.key});
@@ -23,7 +23,7 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen>
       appBar: AppBar(title: const Text('Recipe templates')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
-          await _showCreateTemplateDialog(context);
+          await context.push('/templates/new');
           if (mounted) setState(() {});
         },
         icon: const Icon(Icons.add),
@@ -45,110 +45,27 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen>
               await templateRepo.delete(id);
               if (mounted) setState(() {});
             },
+            onOpen: (id) async {
+              await context.push('/templates/$id/edit');
+              if (mounted) setState(() {});
+            },
           );
         },
       ),
     );
   }
-
-  Future<void> _showCreateTemplateDialog(BuildContext context) async {
-    final templateRepository = ref.read(templateRepositoryProvider);
-    final brewMethodRepository = ref.read(brewMethodRepositoryProvider);
-    final brewMethods = await brewMethodRepository.list();
-
-    final nameController = TextEditingController();
-    final doseController = TextEditingController();
-    final waterController = TextEditingController();
-    final tagsController = TextEditingController();
-    String method = brewMethods.isNotEmpty ? brewMethods.first.name : 'V60';
-
-    if (!context.mounted) return;
-
-    await showDialog<void>(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('New template'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: nameController,
-                      decoration: const InputDecoration(labelText: 'Template name'),
-                    ),
-                    DropdownButtonFormField<String>(
-                      initialValue: brewMethods.any((e) => e.name == method)
-                          ? method
-                          : (brewMethods.isEmpty ? null : brewMethods.first.name),
-                      items: brewMethods
-                          .map((e) => DropdownMenuItem(value: e.name, child: Text(e.name)))
-                          .toList(),
-                      onChanged: (v) => setDialogState(() => method = v ?? method),
-                      decoration: const InputDecoration(labelText: 'Brew method'),
-                    ),
-                    TextField(
-                      controller: doseController,
-                      decoration: const InputDecoration(labelText: 'Default dose (g)'),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    ),
-                    TextField(
-                      controller: waterController,
-                      decoration: const InputDecoration(labelText: 'Default water (g)'),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    ),
-                    TextField(
-                      controller: tagsController,
-                      decoration: const InputDecoration(labelText: 'Tags (comma-separated)'),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  onPressed: () async {
-                    if (nameController.text.trim().isEmpty) return;
-                    await templateRepository.upsert(
-                      name: nameController.text.trim(),
-                      scope: TemplateScope.global,
-                      coffeeId: null,
-                      brewMethod: method,
-                      defaultCoffeeDoseG: double.tryParse(doseController.text),
-                      defaultWaterTotalG: double.tryParse(waterController.text),
-                      steps: [
-                        RecipeStepDraft(type: RecipeStepType.bloom, index: 0, waterG: 60, durationSec: 30),
-                        RecipeStepDraft(type: RecipeStepType.pour, index: 1, waterG: 240, durationSec: 90),
-                      ],
-                      tags: tagsController.text
-                          .split(',')
-                          .map((e) => e.trim())
-                          .where((e) => e.isNotEmpty)
-                          .toList(),
-                    );
-                    if (context.mounted) Navigator.of(context).pop();
-                  },
-                  child: const Text('Save'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
 }
 
 class _TemplateList extends StatelessWidget {
-  const _TemplateList({required this.items, required this.onDelete});
+  const _TemplateList({
+    required this.items,
+    required this.onDelete,
+    required this.onOpen,
+  });
 
   final List<TemplateRecord> items;
   final Future<void> Function(String id) onDelete;
+  final Future<void> Function(String id) onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -163,6 +80,7 @@ class _TemplateList extends StatelessWidget {
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           child: ListTile(
+            onTap: () => onOpen(item.template.id),
             title: Text(item.template.name),
             subtitle: Text(
               '${item.template.brewMethod} • '
@@ -170,9 +88,18 @@ class _TemplateList extends StatelessWidget {
               '${item.template.defaultWaterTotalG?.toStringAsFixed(1) ?? '-'}g • '
               '${item.steps.length} steps',
             ),
-            trailing: IconButton(
-              icon: const Icon(Icons.delete_outline),
-              onPressed: () => onDelete(item.template.id),
+            trailing: PopupMenuButton<String>(
+              onSelected: (value) async {
+                if (value == 'edit') {
+                  await onOpen(item.template.id);
+                } else if (value == 'delete') {
+                  await onDelete(item.template.id);
+                }
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(value: 'edit', child: Text('Edit')),
+                PopupMenuItem(value: 'delete', child: Text('Delete')),
+              ],
             ),
           ),
         );

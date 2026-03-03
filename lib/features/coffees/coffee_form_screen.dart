@@ -107,8 +107,7 @@ class _CoffeeFormScreenState extends ConsumerState<CoffeeFormScreen> {
                 ),
                 TextFormField(
                   controller: _altitudeController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Altitude (m)'),
+                  decoration: const InputDecoration(labelText: 'Altitude'),
                 ),
                 TextFormField(
                   controller: _tastingController,
@@ -134,7 +133,8 @@ class _CoffeeFormScreenState extends ConsumerState<CoffeeFormScreen> {
                       varietal:
                           _varietalController.text.trim().isEmpty ? null : _varietalController.text.trim(),
                       process: _processController.text.trim().isEmpty ? null : _processController.text.trim(),
-                      altitudeM: double.tryParse(_altitudeController.text.trim()),
+                      altitudeM:
+                          _altitudeController.text.trim().isEmpty ? null : _altitudeController.text.trim(),
                       tastingNotes:
                           _tastingController.text.trim().isEmpty ? null : _tastingController.text.trim(),
                       tags: _splitTags(_tagsController.text),

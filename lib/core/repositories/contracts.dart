@@ -67,7 +67,7 @@ abstract class CoffeeRepository {
     String? producer,
     String? varietal,
     String? process,
-    double? altitudeM,
+    String? altitudeM,
     DateTime? roastDate,
     String? tastingNotes,
     List<String> tags,
@@ -119,6 +119,7 @@ abstract class EntryRepository {
 
 abstract class TemplateRepository {
   Future<List<TemplateRecord>> list({String? coffeeId});
+  Future<TemplateRecord?> getById(String id);
 
   Future<void> upsert({
     String? id,

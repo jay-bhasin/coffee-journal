@@ -78,7 +78,7 @@ class LocalCoffeeRepository implements CoffeeRepository {
     String? producer,
     String? varietal,
     String? process,
-    double? altitudeM,
+    String? altitudeM,
     DateTime? roastDate,
     String? tastingNotes,
     List<String> tags = const [],
@@ -503,6 +503,20 @@ class LocalTemplateRepository implements TemplateRepository {
   }
 
   @override
+  Future<TemplateRecord?> getById(String id) async {
+    await _normalizeTemplateScope();
+    final template = await (_db.select(_db.templates)..where((tbl) => tbl.id.equals(id)))
+        .getSingleOrNull();
+    if (template == null) return null;
+    final steps = await (_db.select(_db.templateSteps)
+          ..where((tbl) => tbl.templateId.equals(template.id))
+          ..orderBy([(tbl) => OrderingTerm.asc(tbl.stepIndex)]))
+        .get();
+    final tags = await _tagsForTemplate(template.id);
+    return TemplateRecord(template: template, steps: steps, tags: tags);
+  }
+
+  @override
   Future<void> upsert({
     String? id,
     required String name,
@@ -850,7 +864,7 @@ class LocalBackupRepository implements BackupRepository {
                 producer: Value(map['producer'] as String?),
                 varietal: Value(map['varietal'] as String?),
                 process: Value(map['process'] as String?),
-                altitudeM: Value((map['altitudeM'] as num?)?.toDouble()),
+                altitudeM: Value(_parseAltitude(map['altitudeM'])),
                 roastDate: Value(_parseDate(map['roastDate'])),
                 tastingNotes: Value(map['tastingNotes'] as String?),
                 isArchived: Value(map['isArchived'] as bool? ?? false),
@@ -1067,6 +1081,18 @@ class LocalBackupRepository implements BackupRepository {
   DateTime? _parseDate(Object? date) {
     if (date is String && date.isNotEmpty) {
       return DateTime.tryParse(date);
+    }
+    return null;
+  }
+
+  String? _parseAltitude(Object? raw) {
+    if (raw == null) return null;
+    if (raw is String) {
+      final value = raw.trim();
+      return value.isEmpty ? null : value;
+    }
+    if (raw is num) {
+      return raw.toString();
     }
     return null;
   }

@@ -103,11 +103,11 @@ class $CoffeesTable extends Coffees with TableInfo<$CoffeesTable, Coffee> {
     'altitudeM',
   );
   @override
-  late final GeneratedColumn<double> altitudeM = GeneratedColumn<double>(
+  late final GeneratedColumn<String> altitudeM = GeneratedColumn<String>(
     'altitude_m',
     aliasedName,
     true,
-    type: DriftSqlType.double,
+    type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
   static const VerificationMeta _roastDateMeta = const VerificationMeta(
@@ -364,7 +364,7 @@ class $CoffeesTable extends Coffees with TableInfo<$CoffeesTable, Coffee> {
         data['${effectivePrefix}process'],
       ),
       altitudeM: attachedDatabase.typeMapping.read(
-        DriftSqlType.double,
+        DriftSqlType.string,
         data['${effectivePrefix}altitude_m'],
       ),
       roastDate: attachedDatabase.typeMapping.read(
@@ -410,7 +410,7 @@ class Coffee extends DataClass implements Insertable<Coffee> {
   final String? producer;
   final String? varietal;
   final String? process;
-  final double? altitudeM;
+  final String? altitudeM;
   final DateTime? roastDate;
   final String? tastingNotes;
   final bool isArchived;
@@ -460,7 +460,7 @@ class Coffee extends DataClass implements Insertable<Coffee> {
       map['process'] = Variable<String>(process);
     }
     if (!nullToAbsent || altitudeM != null) {
-      map['altitude_m'] = Variable<double>(altitudeM);
+      map['altitude_m'] = Variable<String>(altitudeM);
     }
     if (!nullToAbsent || roastDate != null) {
       map['roast_date'] = Variable<DateTime>(roastDate);
@@ -527,7 +527,7 @@ class Coffee extends DataClass implements Insertable<Coffee> {
       producer: serializer.fromJson<String?>(json['producer']),
       varietal: serializer.fromJson<String?>(json['varietal']),
       process: serializer.fromJson<String?>(json['process']),
-      altitudeM: serializer.fromJson<double?>(json['altitudeM']),
+      altitudeM: serializer.fromJson<String?>(json['altitudeM']),
       roastDate: serializer.fromJson<DateTime?>(json['roastDate']),
       tastingNotes: serializer.fromJson<String?>(json['tastingNotes']),
       isArchived: serializer.fromJson<bool>(json['isArchived']),
@@ -549,7 +549,7 @@ class Coffee extends DataClass implements Insertable<Coffee> {
       'producer': serializer.toJson<String?>(producer),
       'varietal': serializer.toJson<String?>(varietal),
       'process': serializer.toJson<String?>(process),
-      'altitudeM': serializer.toJson<double?>(altitudeM),
+      'altitudeM': serializer.toJson<String?>(altitudeM),
       'roastDate': serializer.toJson<DateTime?>(roastDate),
       'tastingNotes': serializer.toJson<String?>(tastingNotes),
       'isArchived': serializer.toJson<bool>(isArchived),
@@ -569,7 +569,7 @@ class Coffee extends DataClass implements Insertable<Coffee> {
     Value<String?> producer = const Value.absent(),
     Value<String?> varietal = const Value.absent(),
     Value<String?> process = const Value.absent(),
-    Value<double?> altitudeM = const Value.absent(),
+    Value<String?> altitudeM = const Value.absent(),
     Value<DateTime?> roastDate = const Value.absent(),
     Value<String?> tastingNotes = const Value.absent(),
     bool? isArchived,
@@ -695,7 +695,7 @@ class CoffeesCompanion extends UpdateCompanion<Coffee> {
   final Value<String?> producer;
   final Value<String?> varietal;
   final Value<String?> process;
-  final Value<double?> altitudeM;
+  final Value<String?> altitudeM;
   final Value<DateTime?> roastDate;
   final Value<String?> tastingNotes;
   final Value<bool> isArchived;
@@ -755,7 +755,7 @@ class CoffeesCompanion extends UpdateCompanion<Coffee> {
     Expression<String>? producer,
     Expression<String>? varietal,
     Expression<String>? process,
-    Expression<double>? altitudeM,
+    Expression<String>? altitudeM,
     Expression<DateTime>? roastDate,
     Expression<String>? tastingNotes,
     Expression<bool>? isArchived,
@@ -795,7 +795,7 @@ class CoffeesCompanion extends UpdateCompanion<Coffee> {
     Value<String?>? producer,
     Value<String?>? varietal,
     Value<String?>? process,
-    Value<double?>? altitudeM,
+    Value<String?>? altitudeM,
     Value<DateTime?>? roastDate,
     Value<String?>? tastingNotes,
     Value<bool>? isArchived,
@@ -856,7 +856,7 @@ class CoffeesCompanion extends UpdateCompanion<Coffee> {
       map['process'] = Variable<String>(process.value);
     }
     if (altitudeM.present) {
-      map['altitude_m'] = Variable<double>(altitudeM.value);
+      map['altitude_m'] = Variable<String>(altitudeM.value);
     }
     if (roastDate.present) {
       map['roast_date'] = Variable<DateTime>(roastDate.value);
@@ -6202,7 +6202,7 @@ typedef $$CoffeesTableCreateCompanionBuilder =
       Value<String?> producer,
       Value<String?> varietal,
       Value<String?> process,
-      Value<double?> altitudeM,
+      Value<String?> altitudeM,
       Value<DateTime?> roastDate,
       Value<String?> tastingNotes,
       Value<bool> isArchived,
@@ -6222,7 +6222,7 @@ typedef $$CoffeesTableUpdateCompanionBuilder =
       Value<String?> producer,
       Value<String?> varietal,
       Value<String?> process,
-      Value<double?> altitudeM,
+      Value<String?> altitudeM,
       Value<DateTime?> roastDate,
       Value<String?> tastingNotes,
       Value<bool> isArchived,
@@ -6346,7 +6346,7 @@ class $$CoffeesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<double> get altitudeM => $composableBuilder(
+  ColumnFilters<String> get altitudeM => $composableBuilder(
     column: $table.altitudeM,
     builder: (column) => ColumnFilters(column),
   );
@@ -6511,7 +6511,7 @@ class $$CoffeesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<double> get altitudeM => $composableBuilder(
+  ColumnOrderings<String> get altitudeM => $composableBuilder(
     column: $table.altitudeM,
     builder: (column) => ColumnOrderings(column),
   );
@@ -6583,7 +6583,7 @@ class $$CoffeesTableAnnotationComposer
   GeneratedColumn<String> get process =>
       $composableBuilder(column: $table.process, builder: (column) => column);
 
-  GeneratedColumn<double> get altitudeM =>
+  GeneratedColumn<String> get altitudeM =>
       $composableBuilder(column: $table.altitudeM, builder: (column) => column);
 
   GeneratedColumn<DateTime> get roastDate =>
@@ -6727,7 +6727,7 @@ class $$CoffeesTableTableManager
                 Value<String?> producer = const Value.absent(),
                 Value<String?> varietal = const Value.absent(),
                 Value<String?> process = const Value.absent(),
-                Value<double?> altitudeM = const Value.absent(),
+                Value<String?> altitudeM = const Value.absent(),
                 Value<DateTime?> roastDate = const Value.absent(),
                 Value<String?> tastingNotes = const Value.absent(),
                 Value<bool> isArchived = const Value.absent(),
@@ -6765,7 +6765,7 @@ class $$CoffeesTableTableManager
                 Value<String?> producer = const Value.absent(),
                 Value<String?> varietal = const Value.absent(),
                 Value<String?> process = const Value.absent(),
-                Value<double?> altitudeM = const Value.absent(),
+                Value<String?> altitudeM = const Value.absent(),
                 Value<DateTime?> roastDate = const Value.absent(),
                 Value<String?> tastingNotes = const Value.absent(),
                 Value<bool> isArchived = const Value.absent(),

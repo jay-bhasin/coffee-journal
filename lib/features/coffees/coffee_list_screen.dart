@@ -362,6 +362,7 @@ class _CoffeeCard extends StatelessWidget {
     final metaChips = <String>[
       if (_notBlank(location)) location!,
       if (_notBlank(item.coffee.varietal)) item.coffee.varietal!,
+      if (_notBlank(item.coffee.process)) item.coffee.process!,
     ];
 
     return Card.filled(
@@ -431,8 +432,19 @@ class _CoffeeCard extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 10),
+              if (_notBlank(item.coffee.tastingNotes)) ...[
+                const SizedBox(height: 10),
+                Text(
+                  item.coffee.tastingNotes!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+              const SizedBox(height: 8),
               Text(
                 [
+                  if (_notBlank(item.coffee.altitudeM)) 'Altitude: ${item.coffee.altitudeM!}',
                   if (item.coffee.roastDate != null)
                     'Roast ${DateFormat.yMMMd().format(item.coffee.roastDate!)}',
                   if (item.tags.isNotEmpty) 'Tags: ${item.tags.join(', ')}',

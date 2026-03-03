@@ -6,6 +6,7 @@ import 'package:coffee_journal/features/entries/entry_form_screen.dart';
 import 'package:coffee_journal/features/settings/backup_screen.dart';
 import 'package:coffee_journal/features/entries/entry_list_screen.dart';
 import 'package:coffee_journal/features/settings/settings_screen.dart';
+import 'package:coffee_journal/features/templates/template_form_screen.dart';
 import 'package:coffee_journal/features/templates/templates_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -37,6 +38,7 @@ final appRouter = GoRouter(
               builder: (context, state) => EntryFormScreen(
                 coffeeId: state.pathParameters['coffeeId']!,
                 duplicateFromEntryId: state.uri.queryParameters['duplicateFrom'],
+                templateId: state.uri.queryParameters['templateId'],
               ),
             ),
             GoRoute(
@@ -56,6 +58,17 @@ final appRouter = GoRouter(
         GoRoute(
           path: 'templates',
           builder: (context, state) => const TemplatesScreen(),
+          routes: [
+            GoRoute(
+              path: 'new',
+              builder: (context, state) => const TemplateFormScreen(),
+            ),
+            GoRoute(
+              path: ':templateId/edit',
+              builder: (context, state) =>
+                  TemplateFormScreen(templateId: state.pathParameters['templateId']!),
+            ),
+          ],
         ),
         GoRoute(
           path: 'settings',

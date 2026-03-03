@@ -15,11 +15,13 @@ class EntryFormScreen extends ConsumerStatefulWidget {
     required this.coffeeId,
     this.entryId,
     this.duplicateFromEntryId,
+    this.templateId,
   });
 
   final String coffeeId;
   final String? entryId;
   final String? duplicateFromEntryId;
+  final String? templateId;
 
   @override
   ConsumerState<EntryFormScreen> createState() => _EntryFormScreenState();
@@ -59,7 +61,7 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
 
   List<RecipeStepDraft> _steps = [];
   bool _loaded = false;
-  late Future<EntryRecord?> _loadFuture;
+  late Future<_EntryFormSeed> _loadFuture;
 
   @override
   void initState() {
@@ -71,7 +73,8 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
   void didUpdateWidget(covariant EntryFormScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.entryId != widget.entryId ||
-        oldWidget.duplicateFromEntryId != widget.duplicateFromEntryId) {
+        oldWidget.duplicateFromEntryId != widget.duplicateFromEntryId ||
+        oldWidget.templateId != widget.templateId) {
       _loaded = false;
       _loadFuture = _buildLoadFuture();
     }
@@ -124,16 +127,18 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
           ),
         ],
       ),
-      body: FutureBuilder<EntryRecord?>(
+      body: FutureBuilder<_EntryFormSeed>(
         future: _loadFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting &&
-              (widget.entryId != null || widget.duplicateFromEntryId != null)) {
+              (widget.entryId != null ||
+                  widget.duplicateFromEntryId != null ||
+                  widget.templateId != null)) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (!_loaded && snapshot.data != null) {
-            final EntryRecord item = snapshot.data!;
+          if (!_loaded && snapshot.data != null && snapshot.data!.entry != null) {
+            final EntryRecord item = snapshot.data!.entry!;
             final entry = item.entry;
             _brewAt = widget.entryId == null ? DateTime.now() : entry.brewAt;
             _method = entry.brewMethod;
@@ -189,6 +194,57 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
               _aftertasteController.text = sensory.aftertaste ?? '';
               _sensoryFreeTextController.text = sensory.freeText ?? '';
             }
+            _loaded = true;
+          }
+          if (!_loaded && snapshot.data != null && snapshot.data!.template != null) {
+            final TemplateRecord item = snapshot.data!.template!;
+            final template = item.template;
+            _brewAt = DateTime.now();
+            _method = template.brewMethod;
+            _isStarred = false;
+            _extractionOutcome = ExtractionOutcome.unknown;
+            _coffeeDoseController.text = template.defaultCoffeeDoseG?.toString() ?? '20';
+            _waterController.text = template.defaultWaterTotalG?.toString() ?? '300';
+            _tempController.text = '';
+            _grinderController.text = '';
+            _grindSettingController.text = '';
+            _yieldController.text = '';
+            _pressureController.text = '';
+            _preinfusionController.text = '';
+            _drawdownController.text = '';
+            _agitationController.text = '';
+            _dialInController.text = '';
+            _miscController.text = '';
+            _tagsController.text = item.tags.join(', ');
+            _brewTimeManual = null;
+            _steps = item.steps
+                .map<RecipeStepDraft>(
+                  (s) => RecipeStepDraft(
+                    type: RecipeStepType.values.firstWhere(
+                      (e) => e.name == s.type,
+                      orElse: () => RecipeStepType.custom,
+                    ),
+                    index: s.stepIndex,
+                    startSec: s.startSec,
+                    durationSec: s.durationSec,
+                    note: s.note,
+                    waterG: s.waterG,
+                    flowRateGPerSec: s.flowRateGPerSec,
+                    pressureBar: s.pressureBar,
+                    count: s.count,
+                    tool: s.tool,
+                    label: s.label,
+                    jsonPayload: s.jsonPayload,
+                  ),
+                )
+                .toList(growable: false);
+            _aromaController.text = '';
+            _flavorController.text = '';
+            _acidityController.text = '';
+            _sweetnessController.text = '';
+            _bodyController.text = '';
+            _aftertasteController.text = '';
+            _sensoryFreeTextController.text = '';
             _loaded = true;
           }
 
@@ -654,15 +710,19 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
     return trimmed.isEmpty ? null : trimmed;
   }
 
-  Future<EntryRecord?> _buildLoadFuture() {
-    final repository = ref.read(entryRepositoryProvider);
+  Future<_EntryFormSeed> _buildLoadFuture() async {
+    final entryRepository = ref.read(entryRepositoryProvider);
+    final templateRepository = ref.read(templateRepositoryProvider);
     if (widget.entryId != null) {
-      return repository.getById(widget.entryId!);
+      return _EntryFormSeed(entry: await entryRepository.getById(widget.entryId!));
     }
     if (widget.duplicateFromEntryId != null) {
-      return repository.getById(widget.duplicateFromEntryId!);
+      return _EntryFormSeed(entry: await entryRepository.getById(widget.duplicateFromEntryId!));
     }
-    return Future.value(null);
+    if (widget.templateId != null) {
+      return _EntryFormSeed(template: await templateRepository.getById(widget.templateId!));
+    }
+    return const _EntryFormSeed();
   }
 
   Future<void> _saveEntry(EntryRepository repository, int autoBrewTime) async {
@@ -704,6 +764,13 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
     );
     if (mounted) context.pop();
   }
+}
+
+class _EntryFormSeed {
+  const _EntryFormSeed({this.entry, this.template});
+
+  final EntryRecord? entry;
+  final TemplateRecord? template;
 }
 
 class _StepTimelineMarker extends StatelessWidget {

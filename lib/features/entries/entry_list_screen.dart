@@ -20,15 +20,7 @@ class EntryListScreen extends ConsumerStatefulWidget {
 class _EntryListScreenState extends ConsumerState<EntryListScreen> {
   EntrySortOption _sort = EntrySortOption.starredNewest;
   String? _method;
-  bool _starredOnly = false;
   bool _showSortControls = false;
-  final _tagController = TextEditingController();
-
-  @override
-  void dispose() {
-    _tagController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,11 +31,12 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
     final brewMethodsRepo = ref.watch(brewMethodRepositoryProvider);
     final unitSystem = ref.watch(unitSystemProvider).valueOrNull ?? UnitSystem.metric;
     final unitConverter = ref.watch(unitConverterProvider);
+    final coffeeFuture = coffeeRepository.getById(widget.coffeeId);
 
     return Scaffold(
       appBar: AppBar(
         title: FutureBuilder(
-          future: coffeeRepository.getById(widget.coffeeId),
+          future: coffeeFuture,
           builder: (context, snapshot) {
             final name = snapshot.data?.coffee.name;
             return Text(name == null ? 'Entries' : '$name entries');
@@ -59,7 +52,16 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
-          await context.push('/coffee/${widget.coffeeId}/entry/new');
+          final action = await _showCreateEntryOptions(context);
+          if (!context.mounted || action == null) return;
+
+          if (action == 'blank') {
+            await context.push('/coffee/${widget.coffeeId}/entry/new');
+          } else if (action == 'template') {
+            final templateId = await _selectTemplateId(context, templateRepository);
+            if (!context.mounted || templateId == null) return;
+            await context.push('/coffee/${widget.coffeeId}/entry/new?templateId=$templateId');
+          }
           if (mounted) setState(() {});
         },
         icon: const Icon(Icons.add),
@@ -71,8 +73,6 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
           sort: _sort,
           filter: EntryFilter(
             method: _method,
-            starredOnly: _starredOnly,
-            tag: _tagController.text.trim().isEmpty ? null : _tagController.text,
           ),
         ),
         builder: (context, snapshot) {
@@ -83,6 +83,83 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
 
           return CustomScrollView(
             slivers: [
+              SliverToBoxAdapter(
+                child: FutureBuilder<CoffeeRecord?>(
+                  future: coffeeFuture,
+                  builder: (context, snapshot) {
+                    final record = snapshot.data;
+                    if (record == null) return const SizedBox.shrink();
+                    final coffee = record.coffee;
+                    final location = _formatLocation(coffee.region, coffee.country);
+                    final details = <String>[
+                      if (!_isBlank(location)) location!,
+                      if (!_isBlank(coffee.process)) coffee.process!,
+                      if (!_isBlank(coffee.altitudeM)) 'Altitude: ${coffee.altitudeM!}',
+                      if (!_isBlank(coffee.varietal)) coffee.varietal!,
+                      if (coffee.roastDate != null)
+                        'Roasted ${DateFormat.yMMMd().format(coffee.roastDate!)}',
+                    ];
+                    return Container(
+                      margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            coffee.roaster,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                          if (details.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(details.join(' • ')),
+                          ],
+                          if (record.tags.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            if (!_isBlank(coffee.tastingNotes)) ...[
+                              Text(
+                                coffee.tastingNotes!,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: record.tags
+                                  .map(
+                                    (tag) => Chip(
+                                      visualDensity: VisualDensity.compact,
+                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      labelPadding: const EdgeInsets.symmetric(horizontal: 6),
+                                      label: Text(tag),
+                                    ),
+                                  )
+                                  .toList(growable: false),
+                            ),
+                          ] else if (!_isBlank(coffee.tastingNotes)) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              coffee.tastingNotes!,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
               SliverToBoxAdapter(
                 child: AnimatedSize(
                   duration: const Duration(milliseconds: 180),
@@ -135,22 +212,6 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                                   );
                                 },
                               ),
-                              FilterChip(
-                                label: const Text('Starred only'),
-                                selected: _starredOnly,
-                                onSelected: (v) => setState(() => _starredOnly = v),
-                              ),
-                              SizedBox(
-                                width: 200,
-                                child: TextField(
-                                  controller: _tagController,
-                                  decoration: const InputDecoration(
-                                    hintText: 'Filter tag',
-                                    isDense: true,
-                                  ),
-                                  onChanged: (_) => setState(() {}),
-                                ),
-                              ),
                             ],
                           ),
                         )
@@ -179,9 +240,7 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      if (_method != null ||
-                          _starredOnly ||
-                          _tagController.text.trim().isNotEmpty)
+                      if (_method != null)
                         Align(
                           alignment: Alignment.centerLeft,
                           child: Wrap(
@@ -195,25 +254,6 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                                   labelPadding: const EdgeInsets.symmetric(horizontal: 6),
                                   label: Text('Method: $_method'),
                                   onDeleted: () => setState(() => _method = null),
-                                ),
-                              if (_starredOnly)
-                                Chip(
-                                  visualDensity: VisualDensity.compact,
-                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  labelPadding: const EdgeInsets.symmetric(horizontal: 6),
-                                  label: const Text('Starred only'),
-                                  onDeleted: () => setState(() => _starredOnly = false),
-                                ),
-                              if (_tagController.text.trim().isNotEmpty)
-                                Chip(
-                                  visualDensity: VisualDensity.compact,
-                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  labelPadding: const EdgeInsets.symmetric(horizontal: 6),
-                                  label: Text('Tag: ${_tagController.text.trim()}'),
-                                  onDeleted: () {
-                                    _tagController.clear();
-                                    setState(() {});
-                                  },
                                 ),
                             ],
                           ),
@@ -364,18 +404,12 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                                 await entryRepository.delete(entry.id);
                                 break;
                               case 'create_template':
-                                final defaultName =
-                                    '${entry.brewMethod} ${DateFormat.yMMMd().format(entry.brewAt)}';
-                                final name = await _promptTemplateName(context, defaultName);
-                                if (name == null || name.trim().isEmpty) break;
-                                await templateRepository.upsert(
-                                  name: name.trim(),
-                                  scope: TemplateScope.global,
-                                  coffeeId: null,
-                                  brewMethod: entry.brewMethod,
-                                  defaultCoffeeDoseG: entry.coffeeDoseG,
-                                  defaultWaterTotalG: entry.waterTotalG,
-                                  steps: record.steps
+                                try {
+                                  final defaultName =
+                                      '${entry.brewMethod} ${DateFormat.yMMMd().format(entry.brewAt)}';
+                                  final name = await _promptTemplateName(context, defaultName);
+                                  if (name == null || name.trim().isEmpty) break;
+                                  final steps = record.steps
                                       .map(
                                         (s) => RecipeStepDraft(
                                           type: RecipeStepType.values.firstWhere(
@@ -395,13 +429,36 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                                           jsonPayload: s.jsonPayload,
                                         ),
                                       )
-                                      .toList(),
-                                  tags: record.tags,
-                                );
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Template created')),
+                                      .toList(growable: false);
+                                  final tags = record.tags
+                                      .map((e) => e.trim())
+                                      .where((e) => e.isNotEmpty)
+                                      .toSet()
+                                      .toList(growable: false);
+
+                                  await templateRepository.upsert(
+                                    name: name.trim(),
+                                    scope: TemplateScope.global,
+                                    coffeeId: null,
+                                    brewMethod: entry.brewMethod,
+                                    defaultCoffeeDoseG: entry.coffeeDoseG,
+                                    defaultWaterTotalG: entry.waterTotalG,
+                                    steps: steps,
+                                    tags: tags,
                                   );
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Template created')),
+                                    );
+                                  }
+                                } catch (error, stackTrace) {
+                                  debugPrint('Create template failed: $error');
+                                  debugPrintStack(stackTrace: stackTrace);
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Template creation failed: $error')),
+                                    );
+                                  }
                                 }
                                 break;
                             }
@@ -481,16 +538,29 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
     return hasS ? s : g;
   }
 
+  String? _formatLocation(String? region, String? country) {
+    final r = region?.trim();
+    final c = country?.trim();
+    final hasR = r != null && r.isNotEmpty;
+    final hasC = c != null && c.isNotEmpty;
+    if (!hasR && !hasC) return null;
+    if (hasR && hasC) return '$r, $c';
+    return hasR ? r : c;
+  }
+
+  bool _isBlank(String? value) => value == null || value.trim().isEmpty;
+
   Future<String?> _promptTemplateName(BuildContext context, String initialName) async {
-    final controller = TextEditingController(text: initialName);
+    var draftName = initialName;
     final value = await showDialog<String>(
       context: context,
       builder: (context) {
         return AlertDialog(
           title: const Text('Template name'),
-          content: TextField(
-            controller: controller,
+          content: TextFormField(
+            initialValue: initialName,
             autofocus: true,
+            onChanged: (value) => draftName = value,
             decoration: const InputDecoration(
               labelText: 'Name',
             ),
@@ -501,14 +571,82 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed: () => Navigator.of(context).pop(controller.text),
+              onPressed: () => Navigator.of(context).pop(draftName),
               child: const Text('Create'),
             ),
           ],
         );
       },
     );
-    controller.dispose();
     return value;
+  }
+
+  Future<String?> _showCreateEntryOptions(BuildContext context) {
+    return showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.edit_note),
+                title: const Text('Blank entry'),
+                subtitle: const Text('Start from an empty entry form'),
+                onTap: () => Navigator.of(context).pop('blank'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.description_outlined),
+                title: const Text('From template'),
+                subtitle: const Text('Prefill entry from a saved recipe template'),
+                onTap: () => Navigator.of(context).pop('template'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<String?> _selectTemplateId(
+    BuildContext context,
+    TemplateRepository repository,
+  ) async {
+    final templates = await repository.list();
+    if (templates.isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No templates found. Create one from Settings > Recipe templates.')),
+        );
+      }
+      return null;
+    }
+    if (!context.mounted) return null;
+
+    return showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: templates.length,
+            itemBuilder: (context, index) {
+              final record = templates[index];
+              final template = record.template;
+              final dose = template.defaultCoffeeDoseG?.toStringAsFixed(1) ?? '-';
+              final water = template.defaultWaterTotalG?.toStringAsFixed(1) ?? '-';
+              return ListTile(
+                leading: const Icon(Icons.description_outlined),
+                title: Text(template.name),
+                subtitle: Text('${template.brewMethod} • $dose g / $water g • ${record.steps.length} steps'),
+                onTap: () => Navigator.of(context).pop(template.id),
+              );
+            },
+          ),
+        );
+      },
+    );
   }
 }
