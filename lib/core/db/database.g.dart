@@ -5718,6 +5718,373 @@ class AppSettingsCompanion extends UpdateCompanion<AppSetting> {
   }
 }
 
+class $BrewMethodsTable extends BrewMethods
+    with TableInfo<$BrewMethodsTable, BrewMethod> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $BrewMethodsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _isActiveMeta = const VerificationMeta(
+    'isActive',
+  );
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    name,
+    sortOrder,
+    isActive,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'brew_methods';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<BrewMethod> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sortOrderMeta);
+    }
+    if (data.containsKey('is_active')) {
+      context.handle(
+        _isActiveMeta,
+        isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {name};
+  @override
+  BrewMethod map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return BrewMethod(
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      isActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_active'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $BrewMethodsTable createAlias(String alias) {
+    return $BrewMethodsTable(attachedDatabase, alias);
+  }
+}
+
+class BrewMethod extends DataClass implements Insertable<BrewMethod> {
+  final String name;
+  final int sortOrder;
+  final bool isActive;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const BrewMethod({
+    required this.name,
+    required this.sortOrder,
+    required this.isActive,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['name'] = Variable<String>(name);
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['is_active'] = Variable<bool>(isActive);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  BrewMethodsCompanion toCompanion(bool nullToAbsent) {
+    return BrewMethodsCompanion(
+      name: Value(name),
+      sortOrder: Value(sortOrder),
+      isActive: Value(isActive),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory BrewMethod.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return BrewMethod(
+      name: serializer.fromJson<String>(json['name']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      isActive: serializer.fromJson<bool>(json['isActive']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'name': serializer.toJson<String>(name),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'isActive': serializer.toJson<bool>(isActive),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  BrewMethod copyWith({
+    String? name,
+    int? sortOrder,
+    bool? isActive,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => BrewMethod(
+    name: name ?? this.name,
+    sortOrder: sortOrder ?? this.sortOrder,
+    isActive: isActive ?? this.isActive,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  BrewMethod copyWithCompanion(BrewMethodsCompanion data) {
+    return BrewMethod(
+      name: data.name.present ? data.name.value : this.name,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BrewMethod(')
+          ..write('name: $name, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('isActive: $isActive, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(name, sortOrder, isActive, createdAt, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is BrewMethod &&
+          other.name == this.name &&
+          other.sortOrder == this.sortOrder &&
+          other.isActive == this.isActive &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class BrewMethodsCompanion extends UpdateCompanion<BrewMethod> {
+  final Value<String> name;
+  final Value<int> sortOrder;
+  final Value<bool> isActive;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const BrewMethodsCompanion({
+    this.name = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.isActive = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  BrewMethodsCompanion.insert({
+    required String name,
+    required int sortOrder,
+    this.isActive = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : name = Value(name),
+       sortOrder = Value(sortOrder),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<BrewMethod> custom({
+    Expression<String>? name,
+    Expression<int>? sortOrder,
+    Expression<bool>? isActive,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (name != null) 'name': name,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (isActive != null) 'is_active': isActive,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  BrewMethodsCompanion copyWith({
+    Value<String>? name,
+    Value<int>? sortOrder,
+    Value<bool>? isActive,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return BrewMethodsCompanion(
+      name: name ?? this.name,
+      sortOrder: sortOrder ?? this.sortOrder,
+      isActive: isActive ?? this.isActive,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BrewMethodsCompanion(')
+          ..write('name: $name, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('isActive: $isActive, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -5731,6 +6098,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $EntryTagsTable entryTags = $EntryTagsTable(this);
   late final $TemplateTagsTable templateTags = $TemplateTagsTable(this);
   late final $AppSettingsTable appSettings = $AppSettingsTable(this);
+  late final $BrewMethodsTable brewMethods = $BrewMethodsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5746,6 +6114,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     entryTags,
     templateTags,
     appSettings,
+    brewMethods,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -10699,6 +11068,206 @@ typedef $$AppSettingsTableProcessedTableManager =
       AppSetting,
       PrefetchHooks Function()
     >;
+typedef $$BrewMethodsTableCreateCompanionBuilder =
+    BrewMethodsCompanion Function({
+      required String name,
+      required int sortOrder,
+      Value<bool> isActive,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$BrewMethodsTableUpdateCompanionBuilder =
+    BrewMethodsCompanion Function({
+      Value<String> name,
+      Value<int> sortOrder,
+      Value<bool> isActive,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$BrewMethodsTableFilterComposer
+    extends Composer<_$AppDatabase, $BrewMethodsTable> {
+  $$BrewMethodsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$BrewMethodsTableOrderingComposer
+    extends Composer<_$AppDatabase, $BrewMethodsTable> {
+  $$BrewMethodsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$BrewMethodsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $BrewMethodsTable> {
+  $$BrewMethodsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$BrewMethodsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $BrewMethodsTable,
+          BrewMethod,
+          $$BrewMethodsTableFilterComposer,
+          $$BrewMethodsTableOrderingComposer,
+          $$BrewMethodsTableAnnotationComposer,
+          $$BrewMethodsTableCreateCompanionBuilder,
+          $$BrewMethodsTableUpdateCompanionBuilder,
+          (
+            BrewMethod,
+            BaseReferences<_$AppDatabase, $BrewMethodsTable, BrewMethod>,
+          ),
+          BrewMethod,
+          PrefetchHooks Function()
+        > {
+  $$BrewMethodsTableTableManager(_$AppDatabase db, $BrewMethodsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$BrewMethodsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$BrewMethodsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$BrewMethodsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> name = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => BrewMethodsCompanion(
+                name: name,
+                sortOrder: sortOrder,
+                isActive: isActive,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String name,
+                required int sortOrder,
+                Value<bool> isActive = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => BrewMethodsCompanion.insert(
+                name: name,
+                sortOrder: sortOrder,
+                isActive: isActive,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$BrewMethodsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $BrewMethodsTable,
+      BrewMethod,
+      $$BrewMethodsTableFilterComposer,
+      $$BrewMethodsTableOrderingComposer,
+      $$BrewMethodsTableAnnotationComposer,
+      $$BrewMethodsTableCreateCompanionBuilder,
+      $$BrewMethodsTableUpdateCompanionBuilder,
+      (
+        BrewMethod,
+        BaseReferences<_$AppDatabase, $BrewMethodsTable, BrewMethod>,
+      ),
+      BrewMethod,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -10722,4 +11291,6 @@ class $AppDatabaseManager {
       $$TemplateTagsTableTableManager(_db, _db.templateTags);
   $$AppSettingsTableTableManager get appSettings =>
       $$AppSettingsTableTableManager(_db, _db.appSettings);
+  $$BrewMethodsTableTableManager get brewMethods =>
+      $$BrewMethodsTableTableManager(_db, _db.brewMethods);
 }

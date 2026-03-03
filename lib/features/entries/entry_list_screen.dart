@@ -18,7 +18,7 @@ class EntryListScreen extends ConsumerStatefulWidget {
 
 class _EntryListScreenState extends ConsumerState<EntryListScreen> {
   EntrySortOption _sort = EntrySortOption.starredNewest;
-  BrewMethod? _method;
+  String? _method;
   bool _starredOnly = false;
   final _tagController = TextEditingController();
 
@@ -33,6 +33,7 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
     final coffeeRepository = ref.watch(coffeeRepositoryProvider);
     final entryRepository = ref.watch(entryRepositoryProvider);
     final scaler = ref.watch(recipeScalerProvider);
+    final brewMethodsRepo = ref.watch(brewMethodRepositoryProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -68,15 +69,22 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                       .map((e) => DropdownMenuItem(value: e, child: Text(_entrySortLabel(e))))
                       .toList(),
                 ),
-                DropdownButton<BrewMethod?>(
-                  value: _method,
-                  hint: const Text('Method'),
-                  onChanged: (v) => setState(() => _method = v),
-                  items: [
-                    const DropdownMenuItem(value: null, child: Text('All methods')),
-                    ...BrewMethod.values
-                        .map((e) => DropdownMenuItem(value: e, child: Text(e.label))),
-                  ],
+                FutureBuilder<List<BrewMethodOption>>(
+                  future: brewMethodsRepo.list(),
+                  builder: (context, snapshot) {
+                    final methods = snapshot.data ?? const <BrewMethodOption>[];
+                    return DropdownButton<String?>(
+                      value: _method,
+                      hint: const Text('Method'),
+                      onChanged: (v) => setState(() => _method = v),
+                      items: [
+                        const DropdownMenuItem<String?>(value: null, child: Text('All methods')),
+                        ...methods.map(
+                          (m) => DropdownMenuItem<String?>(value: m.name, child: Text(m.name)),
+                        ),
+                      ],
+                    );
+                  },
                 ),
                 FilterChip(
                   label: const Text('Starred only'),
@@ -150,13 +158,10 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                             switch (v) {
                               case 'toggle_star':
                                 await entryRepository.upsert(
-                                  id: entry.id,
-                                  coffeeId: entry.coffeeId,
-                                  brewAt: entry.brewAt,
-                                  brewMethod: BrewMethod.values.firstWhere(
-                                    (e) => e.name == entry.brewMethod,
-                                    orElse: () => BrewMethod.other,
-                                  ),
+                                id: entry.id,
+                                coffeeId: entry.coffeeId,
+                                brewAt: entry.brewAt,
+                                brewMethod: entry.brewMethod,
                                   isStarred: !entry.isStarred,
                                   coffeeDoseG: entry.coffeeDoseG,
                                   waterTotalG: entry.waterTotalG,

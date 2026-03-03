@@ -171,6 +171,17 @@ class AppSettings extends Table {
   Set<Column<Object>> get primaryKey => {key};
 }
 
+class BrewMethods extends Table {
+  TextColumn get name => text()();
+  IntColumn get sortOrder => integer()();
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {name};
+}
+
 @DriftDatabase(
   tables: [
     Coffees,
@@ -183,6 +194,7 @@ class AppSettings extends Table {
     EntryTags,
     TemplateTags,
     AppSettings,
+    BrewMethods,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -191,7 +203,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -209,6 +221,14 @@ class AppDatabase extends _$AppDatabase {
           await customStatement(
             'CREATE INDEX idx_entry_steps_entry_step ON entry_steps (entry_id, step_index);',
           );
+          await _seedDefaultBrewMethods();
+        },
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            await m.createTable(brewMethods);
+            await _seedDefaultBrewMethods();
+            await _migrateLegacyBrewMethodNames();
+          }
         },
       );
 
@@ -222,6 +242,56 @@ class AppDatabase extends _$AppDatabase {
     final row = await (select(appSettings)..where((tbl) => tbl.key.equals(key)))
         .getSingleOrNull();
     return row?.value;
+  }
+
+  Future<void> _seedDefaultBrewMethods() async {
+    final now = DateTime.now();
+    final defaults = <String>[
+      'Aeropress',
+      'Chemex',
+      'Espresso',
+      'French Press',
+      'Kalita',
+      'Moka',
+      'Unspecified',
+      'V60',
+    ];
+    for (var i = 0; i < defaults.length; i++) {
+      await into(brewMethods).insert(
+        BrewMethodsCompanion(
+          name: Value(defaults[i]),
+          sortOrder: Value(i),
+          isActive: const Value(true),
+          createdAt: Value(now),
+          updatedAt: Value(now),
+        ),
+        mode: InsertMode.insertOrIgnore,
+      );
+    }
+  }
+
+  Future<void> _migrateLegacyBrewMethodNames() async {
+    const mapping = <String, String>{
+      'v60': 'V60',
+      'kalita': 'Kalita',
+      'chemex': 'Chemex',
+      'aeropress': 'Aeropress',
+      'frenchPress': 'French Press',
+      'espresso': 'Espresso',
+      'moka': 'Moka',
+      'other': 'Unspecified',
+      'Other': 'Unspecified',
+    };
+    for (final entry in mapping.entries) {
+      await customStatement(
+        "UPDATE entries SET brew_method = ? WHERE brew_method = ?",
+        [entry.value, entry.key],
+      );
+      await customStatement(
+        "UPDATE templates SET brew_method = ? WHERE brew_method = ?",
+        [entry.value, entry.key],
+      );
+    }
   }
 }
 

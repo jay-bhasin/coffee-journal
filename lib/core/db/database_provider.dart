@@ -5,6 +5,7 @@ import 'package:coffee_journal/core/search/search_indexer.dart';
 import 'package:coffee_journal/core/utils/brew_time_calculator.dart';
 import 'package:coffee_journal/core/utils/recipe_scaler.dart';
 import 'package:coffee_journal/core/utils/unit_converter.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final appDatabaseProvider = Provider<AppDatabase>((ref) {
@@ -39,6 +40,10 @@ final templateRepositoryProvider = Provider<TemplateRepository>((ref) {
   );
 });
 
+final brewMethodRepositoryProvider = Provider<BrewMethodRepository>((ref) {
+  return LocalBrewMethodRepository(ref.watch(appDatabaseProvider));
+});
+
 final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
   return LocalSettingsRepository(ref.watch(appDatabaseProvider));
 });
@@ -50,3 +55,26 @@ final backupRepositoryProvider = Provider<BackupRepository>((ref) {
 final unitSystemProvider = FutureProvider((ref) {
   return ref.watch(settingsRepositoryProvider).getUnitSystem();
 });
+
+final themeModeProvider =
+    StateNotifierProvider<ThemeModeController, ThemeMode>((ref) {
+  return ThemeModeController(ref.watch(settingsRepositoryProvider));
+});
+
+class ThemeModeController extends StateNotifier<ThemeMode> {
+  ThemeModeController(this._settingsRepository) : super(ThemeMode.light) {
+    _load();
+  }
+
+  final SettingsRepository _settingsRepository;
+
+  Future<void> _load() async {
+    final darkEnabled = await _settingsRepository.getDarkModeEnabled();
+    state = darkEnabled ? ThemeMode.dark : ThemeMode.light;
+  }
+
+  Future<void> setDarkModeEnabled(bool enabled) async {
+    state = enabled ? ThemeMode.dark : ThemeMode.light;
+    await _settingsRepository.setDarkModeEnabled(enabled);
+  }
+}

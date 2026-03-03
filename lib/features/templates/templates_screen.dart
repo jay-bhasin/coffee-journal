@@ -88,14 +88,16 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen>
   Future<void> _showCreateTemplateDialog(BuildContext context) async {
     final coffeeRepository = ref.read(coffeeRepositoryProvider);
     final templateRepository = ref.read(templateRepositoryProvider);
+    final brewMethodRepository = ref.read(brewMethodRepositoryProvider);
     final coffees = await coffeeRepository.list();
+    final brewMethods = await brewMethodRepository.list();
 
     final nameController = TextEditingController();
     final doseController = TextEditingController();
     final waterController = TextEditingController();
     final tagsController = TextEditingController();
     TemplateScope scope = TemplateScope.global;
-    BrewMethod method = BrewMethod.v60;
+    String method = brewMethods.isNotEmpty ? brewMethods.first.name : 'V60';
     String? coffeeId;
 
     if (!context.mounted) return;
@@ -136,12 +138,15 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen>
                             .toList(),
                         onChanged: (v) => setDialogState(() => coffeeId = v),
                       ),
-                    DropdownButtonFormField<BrewMethod>(
-                      initialValue: method,
-                      items: BrewMethod.values
-                          .map((e) => DropdownMenuItem(value: e, child: Text(e.label)))
+                    DropdownButtonFormField<String>(
+                      initialValue: brewMethods.any((e) => e.name == method)
+                          ? method
+                          : (brewMethods.isEmpty ? null : brewMethods.first.name),
+                      items: brewMethods
+                          .map((e) => DropdownMenuItem(value: e.name, child: Text(e.name)))
                           .toList(),
                       onChanged: (v) => setDialogState(() => method = v ?? method),
+                      decoration: const InputDecoration(labelText: 'Brew method'),
                     ),
                     TextField(
                       controller: doseController,

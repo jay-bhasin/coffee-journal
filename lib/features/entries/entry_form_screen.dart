@@ -50,7 +50,7 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
   final _aftertasteController = TextEditingController();
   final _sensoryFreeTextController = TextEditingController();
 
-  BrewMethod _method = BrewMethod.v60;
+  String _method = 'V60';
   ExtractionOutcome _extractionOutcome = ExtractionOutcome.unknown;
   DateTime _brewAt = DateTime.now();
   bool _isStarred = false;
@@ -59,6 +59,23 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
 
   List<RecipeStepDraft> _steps = [];
   bool _loaded = false;
+  late Future<EntryRecord?> _loadFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFuture = _buildLoadFuture();
+  }
+
+  @override
+  void didUpdateWidget(covariant EntryFormScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.entryId != widget.entryId ||
+        oldWidget.duplicateFromEntryId != widget.duplicateFromEntryId) {
+      _loaded = false;
+      _loadFuture = _buildLoadFuture();
+    }
+  }
 
   @override
   void dispose() {
@@ -92,20 +109,10 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
     final scaler = ref.watch(recipeScalerProvider);
     final brewTimeCalculator = ref.watch(brewTimeCalculatorProvider);
 
-    Future<EntryRecord?> loadFuture() async {
-      if (widget.entryId != null) {
-        return repository.getById(widget.entryId!);
-      }
-      if (widget.duplicateFromEntryId != null) {
-        return repository.getById(widget.duplicateFromEntryId!);
-      }
-      return null;
-    }
-
     return Scaffold(
       appBar: AppBar(title: Text(widget.entryId == null ? 'New entry' : 'Edit entry')),
       body: FutureBuilder<EntryRecord?>(
-        future: loadFuture(),
+        future: _loadFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting &&
               (widget.entryId != null || widget.duplicateFromEntryId != null)) {
@@ -116,10 +123,7 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
             final EntryRecord item = snapshot.data!;
             final entry = item.entry;
             _brewAt = widget.entryId == null ? DateTime.now() : entry.brewAt;
-            _method = BrewMethod.values.firstWhere(
-              (e) => e.name == entry.brewMethod,
-              orElse: () => BrewMethod.other,
-            );
+            _method = entry.brewMethod;
             _isStarred = entry.isStarred;
             _extractionOutcome = ExtractionOutcome.values.firstWhere(
               (e) => e.name == entry.extractionOutcome,
@@ -175,9 +179,6 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
             _loaded = true;
           }
 
-          final coffeeDose = double.tryParse(_coffeeDoseController.text) ?? 0;
-          final water = double.tryParse(_waterController.text) ?? 0;
-          final ratio = scaler.computeRatio(coffeeDoseG: coffeeDose, waterTotalG: water);
           final autoBrewTime = brewTimeCalculator.calculateAutoBrewTimeSec(_steps);
 
           return Form(
@@ -215,13 +216,23 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<BrewMethod>(
-                  initialValue: _method,
-                  decoration: const InputDecoration(labelText: 'Method'),
-                  items: BrewMethod.values
-                      .map((e) => DropdownMenuItem(value: e, child: Text(e.label)))
-                      .toList(),
-                  onChanged: (value) => setState(() => _method = value ?? _method),
+                FutureBuilder<List<BrewMethodOption>>(
+                  future: ref.watch(brewMethodRepositoryProvider).list(),
+                  builder: (context, methodSnapshot) {
+                    final methods = methodSnapshot.data ?? const <BrewMethodOption>[];
+                    if (methods.isNotEmpty && !methods.any((m) => m.name == _method)) {
+                      _method = methods.first.name;
+                    }
+                    return DropdownButtonFormField<String>(
+                      initialValue:
+                          methods.any((m) => m.name == _method) ? _method : (methods.isEmpty ? null : methods.first.name),
+                      decoration: const InputDecoration(labelText: 'Method'),
+                      items: methods
+                          .map((m) => DropdownMenuItem<String>(value: m.name, child: Text(m.name)))
+                          .toList(),
+                      onChanged: (value) => setState(() => _method = value ?? _method),
+                    );
+                  },
                 ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
@@ -235,10 +246,7 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   validator: (v) => (double.tryParse(v ?? '') ?? 0) <= 0 ? 'Must be > 0' : null,
                   onChanged: (value) {
-                    if (!_ratioLocked) {
-                      setState(() {});
-                      return;
-                    }
+                    if (!_ratioLocked) return;
                     final newDose = double.tryParse(value);
                     if (newDose == null || newDose <= 0) return;
                     final currentRatio = scaler.computeRatio(
@@ -290,7 +298,23 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
                   value: _ratioLocked,
                   onChanged: (v) => setState(() => _ratioLocked = v),
                 ),
-                Text('Ratio: 1:${ratio.toStringAsFixed(1)}'),
+                ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: _coffeeDoseController,
+                  builder: (context, coffeeValue, _) {
+                    return ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _waterController,
+                      builder: (context, waterValue, _) {
+                        final coffeeDose = double.tryParse(coffeeValue.text) ?? 0;
+                        final water = double.tryParse(waterValue.text) ?? 0;
+                        final ratio = scaler.computeRatio(
+                          coffeeDoseG: coffeeDose,
+                          waterTotalG: water,
+                        );
+                        return Text('Ratio: 1:${ratio.toStringAsFixed(1)}');
+                      },
+                    );
+                  },
+                ),
                 TextFormField(
                   controller: _tempController,
                   decoration: const InputDecoration(labelText: 'Water temperature (C)'),
@@ -342,37 +366,69 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
                     ),
                   ],
                 ),
-                ..._steps.asMap().entries.map(
-                      (entry) => Card(
+                if (_steps.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Text('No recipe steps yet.'),
+                  )
+                else
+                  ReorderableListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _steps.length,
+                    onReorder: (oldIndex, newIndex) {
+                      setState(() {
+                        if (newIndex > oldIndex) newIndex -= 1;
+                        final step = _steps.removeAt(oldIndex);
+                        _steps.insert(newIndex, step);
+                        _steps = _steps
+                            .asMap()
+                            .entries
+                            .map((e) => e.value.copyWith(index: e.key))
+                            .toList(growable: false);
+                      });
+                    },
+                    itemBuilder: (context, index) {
+                      final step = _steps[index];
+                      return Card(
+                        key: ValueKey('step-${step.index}-${step.type.name}-$index'),
                         child: ListTile(
-                          title: Text('${entry.key + 1}. ${entry.value.type.name}'),
+                          title: Text('${index + 1}. ${step.type.name}'),
                           subtitle: Text(
                             [
-                              if (entry.value.waterG != null)
-                                '${entry.value.waterG!.toStringAsFixed(1)}g water',
-                              if (entry.value.startSec != null) 'start ${entry.value.startSec}s',
-                              if (entry.value.durationSec != null) 'dur ${entry.value.durationSec}s',
-                              if (entry.value.pressureBar != null)
-                                '${entry.value.pressureBar!.toStringAsFixed(1)}bar',
-                              if (entry.value.note != null) entry.value.note,
+                              if (step.waterG != null) '${step.waterG!.toStringAsFixed(1)}g water',
+                              if (step.startSec != null) 'start ${step.startSec}s',
+                              if (step.durationSec != null) 'dur ${step.durationSec}s',
+                              if (step.pressureBar != null) '${step.pressureBar!.toStringAsFixed(1)}bar',
+                              if (step.note != null) step.note,
                             ].join(' • '),
                           ),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.delete_outline),
-                            onPressed: () {
-                              setState(() {
-                                _steps.removeAt(entry.key);
-                                _steps = _steps
-                                    .asMap()
-                                    .entries
-                                    .map((e) => e.value.copyWith(index: e.key))
-                                    .toList();
-                              });
-                            },
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.delete_outline),
+                                onPressed: () {
+                                  setState(() {
+                                    _steps.removeAt(index);
+                                    _steps = _steps
+                                        .asMap()
+                                        .entries
+                                        .map((e) => e.value.copyWith(index: e.key))
+                                        .toList(growable: false);
+                                  });
+                                },
+                              ),
+                              ReorderableDragStartListener(
+                                index: index,
+                                child: const Icon(Icons.drag_handle),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                    ),
+                      );
+                    },
+                  ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<ExtractionOutcome>(
                   initialValue: _extractionOutcome,
@@ -581,5 +637,16 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
   String? _clean(String raw) {
     final trimmed = raw.trim();
     return trimmed.isEmpty ? null : trimmed;
+  }
+
+  Future<EntryRecord?> _buildLoadFuture() {
+    final repository = ref.read(entryRepositoryProvider);
+    if (widget.entryId != null) {
+      return repository.getById(widget.entryId!);
+    }
+    if (widget.duplicateFromEntryId != null) {
+      return repository.getById(widget.duplicateFromEntryId!);
+    }
+    return Future.value(null);
   }
 }

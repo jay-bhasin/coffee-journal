@@ -42,7 +42,7 @@ class EntryFilter {
     this.end,
   });
 
-  final BrewMethod? method;
+  final String? method;
   final bool starredOnly;
   final String? tag;
   final DateTime? start;
@@ -90,7 +90,7 @@ abstract class EntryRepository {
     String? id,
     required String coffeeId,
     required DateTime brewAt,
-    required BrewMethod brewMethod,
+    required String brewMethod,
     required bool isStarred,
     required double coffeeDoseG,
     required double waterTotalG,
@@ -125,7 +125,7 @@ abstract class TemplateRepository {
     required String name,
     required TemplateScope scope,
     String? coffeeId,
-    required BrewMethod brewMethod,
+    required String brewMethod,
     double? defaultCoffeeDoseG,
     double? defaultWaterTotalG,
     required List<RecipeStepDraft> steps,
@@ -139,6 +139,28 @@ abstract class BackupRepository {
   Future<Map<String, dynamic>> exportBundle();
   Future<ImportPreview> previewImport(Map<String, dynamic> payload);
   Future<void> importBundle(Map<String, dynamic> payload);
+}
+
+abstract class BrewMethodRepository {
+  Future<List<BrewMethodOption>> list({bool includeInactive = false});
+  Future<void> upsert({
+    required String name,
+    bool isActive,
+    int? sortOrder,
+  });
+  Future<void> delete(String name);
+}
+
+class BrewMethodOption {
+  const BrewMethodOption({
+    required this.name,
+    required this.sortOrder,
+    required this.isActive,
+  });
+
+  final String name;
+  final int sortOrder;
+  final bool isActive;
 }
 
 class ImportPreview {
@@ -160,4 +182,6 @@ class ImportPreview {
 abstract class SettingsRepository {
   Future<UnitSystem> getUnitSystem();
   Future<void> setUnitSystem(UnitSystem unitSystem);
+  Future<bool> getDarkModeEnabled();
+  Future<void> setDarkModeEnabled(bool enabled);
 }

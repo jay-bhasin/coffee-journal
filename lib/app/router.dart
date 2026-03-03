@@ -1,7 +1,9 @@
 import 'package:coffee_journal/features/coffees/coffee_form_screen.dart';
 import 'package:coffee_journal/features/coffees/coffee_list_screen.dart';
+import 'package:coffee_journal/features/brew_methods/brew_methods_screen.dart';
 import 'package:coffee_journal/features/entries/entry_detail_screen.dart';
 import 'package:coffee_journal/features/entries/entry_form_screen.dart';
+import 'package:coffee_journal/features/settings/backup_screen.dart';
 import 'package:coffee_journal/features/entries/entry_list_screen.dart';
 import 'package:coffee_journal/features/settings/settings_screen.dart';
 import 'package:coffee_journal/features/templates/templates_screen.dart';
@@ -58,6 +60,14 @@ final appRouter = GoRouter(
         GoRoute(
           path: 'settings',
           builder: (context, state) => const SettingsScreen(),
+        ),
+        GoRoute(
+          path: 'backup',
+          builder: (context, state) => const BackupScreen(),
+        ),
+        GoRoute(
+          path: 'brew-methods',
+          builder: (context, state) => const BrewMethodsScreen(),
         ),
       ],
     ),

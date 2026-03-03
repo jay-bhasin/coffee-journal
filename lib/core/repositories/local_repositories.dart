@@ -198,8 +198,7 @@ class LocalEntryRepository implements EntryRepository {
     await upsert(
       coffeeId: existing.entry.coffeeId,
       brewAt: newDate,
-      brewMethod: BrewMethod.values
-          .firstWhere((e) => e.name == existing.entry.brewMethod, orElse: () => BrewMethod.other),
+      brewMethod: existing.entry.brewMethod,
       isStarred: false,
       coffeeDoseG: existing.entry.coffeeDoseG,
       waterTotalG: existing.entry.waterTotalG,
@@ -269,7 +268,7 @@ class LocalEntryRepository implements EntryRepository {
       ..where((tbl) => tbl.coffeeId.equals(coffeeId));
 
     if (filter.method != null) {
-      q.where((tbl) => tbl.brewMethod.equals(filter.method!.name));
+      q.where((tbl) => tbl.brewMethod.equals(filter.method!));
     }
     if (filter.starredOnly) {
       q.where((tbl) => tbl.isStarred.equals(true));
@@ -331,7 +330,7 @@ class LocalEntryRepository implements EntryRepository {
     String? id,
     required String coffeeId,
     required DateTime brewAt,
-    required BrewMethod brewMethod,
+    required String brewMethod,
     required bool isStarred,
     required double coffeeDoseG,
     required double waterTotalG,
@@ -359,7 +358,7 @@ class LocalEntryRepository implements EntryRepository {
         .getSingleOrNull();
 
     final searchText = _searchIndexer.buildIndex([
-      brewMethod.name,
+      brewMethod,
       grinder,
       grindSetting,
       dialInNotes,
@@ -373,7 +372,7 @@ class LocalEntryRepository implements EntryRepository {
             id: Value(entityId),
             coffeeId: Value(coffeeId),
             brewAt: Value(brewAt),
-            brewMethod: Value(brewMethod.name),
+            brewMethod: Value(brewMethod),
             isStarred: Value(isStarred),
             coffeeDoseG: Value(coffeeDoseG),
             waterTotalG: Value(waterTotalG),
@@ -512,7 +511,7 @@ class LocalTemplateRepository implements TemplateRepository {
     required String name,
     required TemplateScope scope,
     String? coffeeId,
-    required BrewMethod brewMethod,
+    required String brewMethod,
     double? defaultCoffeeDoseG,
     double? defaultWaterTotalG,
     required List<RecipeStepDraft> steps,
@@ -530,10 +529,10 @@ class LocalTemplateRepository implements TemplateRepository {
             name: Value(name),
             scope: Value(scope.name),
             coffeeId: Value(scope == TemplateScope.coffee ? coffeeId : null),
-            brewMethod: Value(brewMethod.name),
+            brewMethod: Value(brewMethod),
             defaultCoffeeDoseG: Value(defaultCoffeeDoseG),
             defaultWaterTotalG: Value(defaultWaterTotalG),
-            searchText: Value(_searchIndexer.buildIndex([name, brewMethod.name, ...tags])),
+            searchText: Value(_searchIndexer.buildIndex([name, brewMethod, ...tags])),
             createdAt: Value(existing?.createdAt ?? now),
             updatedAt: Value(now),
           ),
@@ -631,6 +630,123 @@ class LocalSettingsRepository implements SettingsRepository {
   Future<void> setUnitSystem(UnitSystem unitSystem) {
     return _db.upsertSetting('unit_system', unitSystem.name);
   }
+
+  @override
+  Future<bool> getDarkModeEnabled() async {
+    final value = await _db.getSetting('dark_mode_enabled');
+    return value == 'true';
+  }
+
+  @override
+  Future<void> setDarkModeEnabled(bool enabled) {
+    return _db.upsertSetting('dark_mode_enabled', enabled.toString());
+  }
+}
+
+class LocalBrewMethodRepository implements BrewMethodRepository {
+  LocalBrewMethodRepository(this._db);
+
+  final AppDatabase _db;
+  static const String defaultMethodName = 'Unspecified';
+
+  @override
+  Future<void> delete(String name) async {
+    await _ensureDefaultMethod();
+    if (name == defaultMethodName) {
+      return;
+    }
+    await (_db.update(_db.entries)..where((tbl) => tbl.brewMethod.equals(name))).write(
+      const EntriesCompanion(brewMethod: Value(defaultMethodName)),
+    );
+    await (_db.update(_db.templates)..where((tbl) => tbl.brewMethod.equals(name))).write(
+      const TemplatesCompanion(brewMethod: Value(defaultMethodName)),
+    );
+    await (_db.delete(_db.brewMethods)..where((tbl) => tbl.name.equals(name))).go();
+  }
+
+  @override
+  Future<List<BrewMethodOption>> list({bool includeInactive = false}) async {
+    await _ensureDefaultMethod();
+    final q = _db.select(_db.brewMethods)
+      ..orderBy([(tbl) => OrderingTerm.asc(tbl.name)]);
+    if (!includeInactive) {
+      q.where((tbl) => tbl.isActive.equals(true));
+    }
+
+    final rows = await q.get();
+    return rows
+        .map(
+          (e) => BrewMethodOption(
+            name: e.name,
+            sortOrder: e.sortOrder,
+            isActive: e.isActive,
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  @override
+  Future<void> upsert({
+    required String name,
+    bool isActive = true,
+    int? sortOrder,
+  }) async {
+    await _ensureDefaultMethod();
+    final normalizedName = name.trim();
+    if (normalizedName.isEmpty) return;
+    final existing = await (_db.select(_db.brewMethods)
+          ..where((tbl) => tbl.name.equals(normalizedName)))
+        .getSingleOrNull();
+    final maxOrder = _db.brewMethods.sortOrder.max();
+    final maxRes = await (_db.selectOnly(_db.brewMethods)..addColumns([maxOrder])).getSingleOrNull();
+    final nextOrder = (maxRes?.read(maxOrder) ?? -1) + 1;
+    final now = DateTime.now();
+
+    await _db.into(_db.brewMethods).insertOnConflictUpdate(
+          BrewMethodsCompanion(
+            name: Value(normalizedName),
+            sortOrder: Value(sortOrder ?? existing?.sortOrder ?? nextOrder),
+            isActive: Value(isActive),
+            createdAt: Value(existing?.createdAt ?? now),
+            updatedAt: Value(now),
+          ),
+        );
+  }
+
+  Future<void> _ensureDefaultMethod() async {
+    final now = DateTime.now();
+    final legacyOther = await (_db.select(_db.brewMethods)
+          ..where((tbl) => tbl.name.equals('Other')))
+        .getSingleOrNull();
+    if (legacyOther != null) {
+      await (_db.update(_db.entries)..where((tbl) => tbl.brewMethod.equals('Other'))).write(
+        const EntriesCompanion(brewMethod: Value(defaultMethodName)),
+      );
+      await (_db.update(_db.templates)..where((tbl) => tbl.brewMethod.equals('Other'))).write(
+        const TemplatesCompanion(brewMethod: Value(defaultMethodName)),
+      );
+      await (_db.delete(_db.brewMethods)..where((tbl) => tbl.name.equals('Other'))).go();
+    }
+
+    final existing = await (_db.select(_db.brewMethods)
+          ..where((tbl) => tbl.name.equals(defaultMethodName)))
+        .getSingleOrNull();
+    if (existing == null) {
+      final maxOrder = _db.brewMethods.sortOrder.max();
+      final maxRes = await (_db.selectOnly(_db.brewMethods)..addColumns([maxOrder])).getSingleOrNull();
+      final nextOrder = (maxRes?.read(maxOrder) ?? -1) + 1;
+      await _db.into(_db.brewMethods).insert(
+            BrewMethodsCompanion(
+              name: const Value(defaultMethodName),
+              sortOrder: Value(nextOrder),
+              isActive: const Value(true),
+              createdAt: Value(now),
+              updatedAt: Value(now),
+            ),
+            mode: InsertMode.insertOrIgnore,
+          );
+    }
+  }
 }
 
 class LocalBackupRepository implements BackupRepository {
@@ -653,6 +769,7 @@ class LocalBackupRepository implements BackupRepository {
     final entryTags = await _db.select(_db.entryTags).get();
     final templateTags = await _db.select(_db.templateTags).get();
     final settings = await _db.select(_db.appSettings).get();
+    final brewMethods = await _db.select(_db.brewMethods).get();
 
     return {
       'schemaVersion': schemaVersion,
@@ -668,6 +785,17 @@ class LocalBackupRepository implements BackupRepository {
       'templateTags':
           templateTags.map((e) => {'templateId': e.templateId, 'tagId': e.tagId}).toList(),
       'settings': settings.map((s) => {'key': s.key, 'value': s.value}).toList(),
+      'brewMethods': brewMethods
+          .map(
+            (m) => {
+              'name': m.name,
+              'sortOrder': m.sortOrder,
+              'isActive': m.isActive,
+              'createdAt': m.createdAt.toIso8601String(),
+              'updatedAt': m.updatedAt.toIso8601String(),
+            },
+          )
+          .toList(),
     };
   }
 
@@ -856,6 +984,19 @@ class LocalBackupRepository implements BackupRepository {
                 tagId: Value(tagMap[map['tagId'] as String]!),
               ),
               mode: InsertMode.insertOrIgnore,
+            );
+      }
+
+      for (final raw in (payload['brewMethods'] as List<dynamic>? ?? <dynamic>[])) {
+        final map = Map<String, dynamic>.from(raw as Map);
+        await _db.into(_db.brewMethods).insertOnConflictUpdate(
+              BrewMethodsCompanion(
+                name: Value(map['name'] as String),
+                sortOrder: Value(map['sortOrder'] as int? ?? 0),
+                isActive: Value(map['isActive'] as bool? ?? true),
+                createdAt: Value(_parseDate(map['createdAt']) ?? DateTime.now()),
+                updatedAt: Value(_parseDate(map['updatedAt']) ?? DateTime.now()),
+              ),
             );
       }
 
