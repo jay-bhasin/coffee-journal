@@ -65,118 +65,247 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
         icon: const Icon(Icons.add),
         label: const Text('Entry'),
       ),
-      body: Column(
-        children: [
-          if (_showSortControls)
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  DropdownButton<EntrySortOption>(
-                    value: _sort,
-                    onChanged: (v) => setState(() => _sort = v ?? _sort),
-                    items: EntrySortOption.values
-                        .map((e) => DropdownMenuItem(value: e, child: Text(_entrySortLabel(e))))
-                        .toList(),
-                  ),
-                  FutureBuilder<List<BrewMethodOption>>(
-                    future: brewMethodsRepo.list(),
-                    builder: (context, snapshot) {
-                      final methods = snapshot.data ?? const <BrewMethodOption>[];
-                      return DropdownButton<String?>(
-                        value: _method,
-                        hint: const Text('Method'),
-                        onChanged: (v) => setState(() => _method = v),
-                        items: [
-                          const DropdownMenuItem<String?>(value: null, child: Text('All methods')),
-                          ...methods.map(
-                            (m) => DropdownMenuItem<String?>(value: m.name, child: Text(m.name)),
+      body: FutureBuilder<List<EntryRecord>>(
+        future: entryRepository.listForCoffee(
+          widget.coffeeId,
+          sort: _sort,
+          filter: EntryFilter(
+            method: _method,
+            starredOnly: _starredOnly,
+            tag: _tagController.text.trim().isEmpty ? null : _tagController.text,
+          ),
+        ),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final items = snapshot.data ?? [];
+
+          return CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: AnimatedSize(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOut,
+                  child: _showSortControls
+                      ? Container(
+                          margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                            borderRadius: BorderRadius.circular(16),
                           ),
-                        ],
-                      );
-                    },
-                  ),
-                  FilterChip(
-                    label: const Text('Starred only'),
-                    selected: _starredOnly,
-                    onSelected: (v) => setState(() => _starredOnly = v),
-                  ),
-                  SizedBox(
-                    width: 180,
-                    child: TextField(
-                      controller: _tagController,
-                      decoration: const InputDecoration(
-                        hintText: 'Filter tag',
-                        isDense: true,
-                      ),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          Expanded(
-            child: FutureBuilder<List<EntryRecord>>(
-              future: entryRepository.listForCoffee(
-                widget.coffeeId,
-                sort: _sort,
-                filter: EntryFilter(
-                  method: _method,
-                  starredOnly: _starredOnly,
-                  tag: _tagController.text.trim().isEmpty ? null : _tagController.text,
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              DropdownButton<EntrySortOption>(
+                                value: _sort,
+                                onChanged: (v) => setState(() => _sort = v ?? _sort),
+                                items: EntrySortOption.values
+                                    .map(
+                                      (e) => DropdownMenuItem(
+                                        value: e,
+                                        child: Text(_entrySortLabel(e)),
+                                      ),
+                                    )
+                                    .toList(),
+                              ),
+                              FutureBuilder<List<BrewMethodOption>>(
+                                future: brewMethodsRepo.list(),
+                                builder: (context, snapshot) {
+                                  final methods = snapshot.data ?? const <BrewMethodOption>[];
+                                  return DropdownButton<String?>(
+                                    value: _method,
+                                    hint: const Text('Method'),
+                                    onChanged: (v) => setState(() => _method = v),
+                                    items: [
+                                      const DropdownMenuItem<String?>(
+                                        value: null,
+                                        child: Text('All methods'),
+                                      ),
+                                      ...methods.map(
+                                        (m) => DropdownMenuItem<String?>(
+                                          value: m.name,
+                                          child: Text(m.name),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+                              FilterChip(
+                                label: const Text('Starred only'),
+                                selected: _starredOnly,
+                                onSelected: (v) => setState(() => _starredOnly = v),
+                              ),
+                              SizedBox(
+                                width: 200,
+                                child: TextField(
+                                  controller: _tagController,
+                                  decoration: const InputDecoration(
+                                    hintText: 'Filter tag',
+                                    isDense: true,
+                                  ),
+                                  onChanged: (_) => setState(() {}),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : const SizedBox.shrink(),
                 ),
               ),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final items = snapshot.data ?? [];
-                if (items.isEmpty) {
-                  return const Center(child: Text('No entries yet. Add your first brew entry.'));
-                }
-
-                return ListView.builder(
-                  itemCount: items.length,
-                  itemBuilder: (context, index) {
-                    final record = items[index];
-                    final entry = record.entry;
-                    final ratio = scaler.computeRatio(
-                      coffeeDoseG: entry.coffeeDoseG,
-                      waterTotalG: entry.waterTotalG,
-                    );
-                    final brewTime = entry.brewTimeSecManual ?? entry.brewTimeSecAuto;
-                    final tempLabel = _formatTemperature(entry.waterTempC, unitSystem, unitConverter);
-                    final grinderLabel = _formatGrinder(entry.grinder, entry.grindSetting);
-
-                    return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      child: ListTile(
-                        title: Text(
-                          '${DateFormat.yMMMd().add_Hm().format(entry.brewAt)} • ${entry.brewMethod}',
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'All Entries (${items.length})',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const Spacer(),
+                          Chip(
+                            visualDensity: VisualDensity.compact,
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            labelPadding: const EdgeInsets.symmetric(horizontal: 6),
+                            avatar: const Icon(Icons.sort, size: 18),
+                            label: Text(_entrySortLabel(_sort)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      if (_method != null ||
+                          _starredOnly ||
+                          _tagController.text.trim().isNotEmpty)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              if (_method != null)
+                                Chip(
+                                  visualDensity: VisualDensity.compact,
+                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  labelPadding: const EdgeInsets.symmetric(horizontal: 6),
+                                  label: Text('Method: $_method'),
+                                  onDeleted: () => setState(() => _method = null),
+                                ),
+                              if (_starredOnly)
+                                Chip(
+                                  visualDensity: VisualDensity.compact,
+                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  labelPadding: const EdgeInsets.symmetric(horizontal: 6),
+                                  label: const Text('Starred only'),
+                                  onDeleted: () => setState(() => _starredOnly = false),
+                                ),
+                              if (_tagController.text.trim().isNotEmpty)
+                                Chip(
+                                  visualDensity: VisualDensity.compact,
+                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  labelPadding: const EdgeInsets.symmetric(horizontal: 6),
+                                  label: Text('Tag: ${_tagController.text.trim()}'),
+                                  onDeleted: () {
+                                    _tagController.clear();
+                                    setState(() {});
+                                  },
+                                ),
+                            ],
+                          ),
                         ),
-                        subtitle: Text(
-                          '${_formatWeight(entry.coffeeDoseG)} / '
-                          '${_formatWeight(entry.waterTotalG)} '
-                          '(1:${ratio.toStringAsFixed(1)}) • '
-                          '${tempLabel ?? '-'} • '
-                          '${grinderLabel ?? '-'} • '
-                          '${_formatDuration(brewTime)}',
-                        ),
-                        leading: entry.isStarred
-                            ? const Icon(Icons.star, color: Colors.amber)
-                            : const Icon(Icons.coffee),
-                        trailing: PopupMenuButton<String>(
+                    ],
+                  ),
+                ),
+              ),
+              if (items.isEmpty)
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text('No entries yet. Add your first brew entry.'),
+                    ),
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 96),
+                  sliver: SliverList.builder(
+                    itemCount: items.length,
+                    itemBuilder: (context, index) {
+                      final record = items[index];
+                      final entry = record.entry;
+                      final ratio = scaler.computeRatio(
+                        coffeeDoseG: entry.coffeeDoseG,
+                        waterTotalG: entry.waterTotalG,
+                      );
+                      final brewTime = entry.brewTimeSecManual ?? entry.brewTimeSecAuto;
+                      final tempLabel = _formatTemperature(
+                        entry.waterTempC,
+                        unitSystem,
+                        unitConverter,
+                      );
+                      final grinderLabel = _formatGrinder(entry.grinder, entry.grindSetting);
+
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Card.filled(
+                          color: Theme.of(context).colorScheme.surfaceContainerLow,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+                            title: Text(
+                              DateFormat.yMMMd().add_Hm().format(entry.brewAt),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.w700),
+                            ),
+                            subtitle: Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${_formatWeight(entry.coffeeDoseG)} / ${_formatWeight(entry.waterTotalG)} '
+                                    '(1:${ratio.toStringAsFixed(1)})',
+                                  ),
+                                  Text(
+                                    <String?>[
+                                      tempLabel,
+                                      grinderLabel,
+                                      _formatDuration(brewTime),
+                                    ].whereType<String>().join(' • '),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Chip(
+                                    visualDensity: VisualDensity.compact,
+                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    labelPadding: const EdgeInsets.symmetric(horizontal: 6),
+                                    label: Text(entry.brewMethod),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            leading: entry.isStarred
+                                ? const Icon(Icons.star, color: Colors.amber)
+                                : const Icon(Icons.coffee),
+                            trailing: PopupMenuButton<String>(
                           onSelected: (v) async {
                             switch (v) {
                               case 'toggle_star':
                                 await entryRepository.upsert(
-                                id: entry.id,
-                                coffeeId: entry.coffeeId,
-                                brewAt: entry.brewAt,
-                                brewMethod: entry.brewMethod,
+                                  id: entry.id,
+                                  coffeeId: entry.coffeeId,
+                                  brewAt: entry.brewAt,
+                                  brewMethod: entry.brewMethod,
                                   isStarred: !entry.isStarred,
                                   coffeeDoseG: entry.coffeeDoseG,
                                   waterTotalG: entry.waterTotalG,
@@ -291,19 +420,20 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                             ),
                             const PopupMenuItem(value: 'delete', child: Text('Delete')),
                           ],
+                            ),
+                            onTap: () async {
+                              await context.push('/entry/${entry.id}');
+                              if (mounted) setState(() {});
+                            },
+                          ),
                         ),
-                        onTap: () async {
-                          await context.push('/entry/${entry.id}');
-                          if (mounted) setState(() {});
-                        },
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-        ],
+                      );
+                    },
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -347,8 +477,8 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
     final hasG = g != null && g.isNotEmpty;
     final hasS = s != null && s.isNotEmpty;
     if (!hasG && !hasS) return null;
-    if (hasG && hasS) return '$g • $s';
-    return hasG ? g : s;
+    if (hasG && hasS) return '$s ($g)';
+    return hasS ? s : g;
   }
 
   Future<String?> _promptTemplateName(BuildContext context, String initialName) async {

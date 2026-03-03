@@ -1,110 +1,143 @@
-# Coffee Journal Flutter App - Project Context
+# Coffee Journal Flutter App - Project Context (Updated)
 
 ## Overview
-This project was created as a local-first Flutter mobile app (iOS + Android) for tracking coffee brewing journals. It follows a structured data model with SQLite persistence, typed repositories, and feature-oriented UI modules.
+This is a local-first Flutter app for coffee brewing journaling (iOS + Android) built with Riverpod, GoRouter, and Drift/SQLite.
 
-Core goals implemented:
-- Coffee catalog with metadata and tags
-- Per-coffee journal entries with brewing details and recipe steps
-- Recipe templates (global and per-coffee)
-- Starred entries sorting and entry filtering
-- Unit preference setting (metric/imperial display preference)
-- JSON export/import backup flow
-- Test coverage for core brewing logic utilities
+Current product focuses on:
+- Coffee catalog + metadata
+- Entry journaling per coffee with recipe steps
+- Global recipe templates
+- Editable brew methods
+- Local backup/restore (JSON)
+- Settings for units + dark mode
 
-## Original Plan (Implementation Intent)
-The app was built around these decisions:
-- **Architecture:** Flutter + Riverpod + GoRouter + Drift (SQLite)
-- **Storage:** Local SQLite only (no auth/cloud sync in v1)
-- **Data model:** `Coffee`, `JournalEntry`, `RecipeStep`, `RecipeTemplate`, `Tag`
-- **Recipe approach:** Hybrid typed steps + custom step support
-- **Entry ordering:** Starred-first then newest-first by default
-- **Backup:** Manual JSON export/import with preview
-- **Units:** Metric canonical values in storage, with unit-system preference
+## Tech Stack
+- Flutter (Material 3)
+- `flutter_riverpod`
+- `go_router`
+- `drift` + `sqlite3_flutter_libs`
+- `json_serializable` / `json_annotation`
 
-## What Was Implemented (Step-by-Step)
+## Data Layer
+Defined in `lib/core/db/database.dart`.
 
-### 1. Project scaffolding
-- Generated a fresh Flutter app in this workspace.
-- Added dependencies for state management, routing, database, serialization, and testing support.
-
-### 2. Core dependencies and config
-`pubspec.yaml` was updated to include:
-- Runtime: `flutter_riverpod`, `go_router`, `drift`, `sqlite3_flutter_libs`, `path_provider`, `path`, `json_annotation`, `intl`, `uuid`
-- Dev: `drift_dev`, `build_runner`, `json_serializable`, `flutter_lints`
-
-### 3. Domain models and utilities
-Created foundational model and utility files:
-- Enums for methods, step types, outcomes, template scope, unit system, sort options
-- `RecipeStepDraft` as editor/repository transfer object
-- `SensoryNotes` JSON model
-- `RecipeScaler` for ratio and proportional pour redistribution
-- `BrewTimeCalculator` for auto brew-time derivation
-- `UnitConverter` for unit conversion helpers
-- `SearchIndexer` for normalized search text/token building
-
-### 4. SQLite schema (Drift)
-Implemented `lib/core/db/database.dart` with tables:
+Key tables:
 - `coffees`, `entries`, `entry_steps`
 - `templates`, `template_steps`
-- `tags`, `coffee_tags`, `entry_tags`, `template_tags`
+- `tags`, join tables
 - `app_settings`
+- `brew_methods`
 
-Added indexes and foreign-key cascade relationships matching the intended behavior.
+Schema version: **2**.
 
-### 5. Repository layer
-Defined repository contracts and local implementations:
+Notable migration behavior:
+- Adds `brew_methods`
+- Migrates legacy brew-method names (`other`/`Other`) to `Unspecified`
+
+## Repository Layer
+Contracts and implementations:
+- `lib/core/repositories/contracts.dart`
+- `lib/core/repositories/local_repositories.dart`
+
+Main repositories:
 - `CoffeeRepository`
 - `EntryRepository`
 - `TemplateRepository`
+- `BrewMethodRepository`
 - `SettingsRepository`
 - `BackupRepository`
 
-Implemented local logic for:
-- CRUD operations
-- Tag normalization/de-duplication
-- Entry duplication to a new day
-- Filter/sort queries (including starred-first mode)
-- JSON export/import with schema version check and conflict handling strategy
+Important logic:
+- Templates are normalized to **global only**
+- Deleting a brew method remaps related entries/templates to `Unspecified`
+- Backup includes brew methods
 
-### 6. Providers
-Created Riverpod providers to wire:
-- Database singleton lifecycle
-- Repository implementations
-- Utility services (`RecipeScaler`, `BrewTimeCalculator`, etc.)
+## Navigation / Screens
+Routes in `lib/app/router.dart`.
 
-### 7. Navigation and app shell
-- Replaced default counter app with app shell + GoRouter routes.
-- Added routes for coffee list/form, entry list/detail/form, templates, and settings.
+Screens:
+- Home coffee list: `lib/features/coffees/coffee_list_screen.dart`
+- Coffee form: `lib/features/coffees/coffee_form_screen.dart`
+- Entry list: `lib/features/entries/entry_list_screen.dart`
+- Entry form/edit: `lib/features/entries/entry_form_screen.dart`
+- Entry detail: `lib/features/entries/entry_detail_screen.dart`
+- Templates: `lib/features/templates/templates_screen.dart`
+- Brew methods: `lib/features/brew_methods/brew_methods_screen.dart`
+- Settings: `lib/features/settings/settings_screen.dart`
+- Backup: `lib/features/settings/backup_screen.dart`
 
-### 8. UI feature screens
-Implemented feature screens:
-- Coffee list with search/sort + CRUD actions
-- Coffee form for metadata + tags
-- Entry list with sort/filter/star/duplicate/delete
-- Entry detail view for full read-only data
-- Entry form/editor with recipe steps, ratio lock option, and sensory fields
-- Templates screen with global/per-coffee tabs and template creation
-- Settings with unit preference and JSON backup/import preview flow
+## Current Product Decisions
+- Brew methods are DB-driven, editable, alphabetical.
+- `Unspecified` is locked and non-deletable.
+- Templates are global-only.
+- Template can be created from entry (entry list and detail menus).
+- Entry detail menu mirrors entry list menu actions.
 
-### 9. Code generation and quality checks
-- Ran `build_runner` for Drift and JSON generated files.
-- Fixed analyzer issues due to API changes and typing.
-- Ran `flutter analyze` and ensured clean output.
-- Added/updated tests and ensured `flutter test` passes.
+## Settings
+Settings screen currently provides:
+- Unit system (metric/imperial)
+- Dark mode toggle
+- Manage brew methods
+- Recipe templates navigation
+- Backup/restore navigation
 
-### 10. Bug fix after manual testing
-A runtime cast error occurred when editing entries without recipe steps:
-- Error: `type 'List<dynamic>' is not a subtype of type 'List<RecipeStepDraft>'`
-- Cause: `FutureBuilder` and `loadFuture()` were typed as `dynamic`, allowing runtime list inference.
-- Fix: made the edit loader fully typed:
-  - `Future<EntryRecord?> loadFuture()`
-  - `FutureBuilder<EntryRecord?>`
-  - explicit typed mapping `.map<RecipeStepDraft>(...)`
-- Post-fix: `flutter analyze` passed.
+Backup/import UI is in dedicated `BackupScreen`.
 
-## Current Project Structure
+## Entry Editing/Display Behavior
+### Entry form
+- Cached loading future to prevent focus loss while typing.
+- Save via app-bar icon and bottom button share one save handler.
+- Recipe steps support add/edit/delete/reorder.
+- Timeline marker shown next to steps.
 
+### Entry list
+- Filters/sort panel toggled from app bar.
+- Header shows entry count + sort chip + active filter chips.
+- Entry card formatting:
+  - Brew method shown as chip
+  - Other metadata as regular text
+  - Grinder format: `GrindSize (Grinder)`
+- Entry menu actions:
+  - Star/Unstar
+  - Duplicate as today
+  - Edit
+  - Create template from entry
+  - Delete
+
+### Entry detail
+- Same menu actions as entry list.
+- Star indicator in app bar when starred.
+- Timeline-style recipe list with final `End` tile.
+- `Start`/`Dur` removed from step subtitle.
+- Hides empty fields.
+- Suppresses extraction outcome when `unknown`.
+
+## Formatting Rules (Current)
+Applied in entry list/detail:
+- Temperature: `<number>° C` or `<number>° F`
+- Time: `mm:ss`
+- Weight: `<number> g`
+- Grinder: `GrindSize (Grinder)` when both exist
+
+## Home Screen Aesthetic State
+Home screen currently includes:
+- `SliverAppBar.large`
+- Search toggle in app bar
+- Compact metrics strip under search/title showing:
+  - distinct roaster count
+  - total coffee count
+  - distinct brew method count
+- Metrics tile layout: label above number
+- Section header: `All Coffees (N)` + sort chip
+- Active context chips (search only)
+- Coffee card metadata chip now combines location as `Region, Country`
+
+## Known UX Rationale
+- No avatar circles on coffee tiles (avoids decorative clutter).
+- Hero strip retained only where metrics are meaningful and compact.
+- Dense chips used selectively to keep information readable on mobile.
+
+## Current Structure
 ```text
 lib/
   app/
@@ -130,6 +163,8 @@ lib/
       recipe_scaler.dart
       unit_converter.dart
   features/
+    brew_methods/
+      brew_methods_screen.dart
     coffees/
       coffee_form_screen.dart
       coffee_list_screen.dart
@@ -138,6 +173,7 @@ lib/
       entry_form_screen.dart
       entry_list_screen.dart
     settings/
+      backup_screen.dart
       settings_screen.dart
     templates/
       templates_screen.dart
@@ -150,19 +186,8 @@ test/
   widget_test.dart
 ```
 
-## Important Behavior Notes for Future Iteration
-- Entry editor supports recipe steps but currently uses a straightforward dialog-based step editor.
-- Unit-system preference is stored in settings, while data remains metric in storage.
-- Import uses a conflict strategy that creates new IDs and stores ID mapping metadata.
-- Template CRUD is present; richer “apply template directly to entry draft” UX can be expanded.
-- Search is normalized text-based and local; can evolve into FTS if needed.
-
-## How to Continue (for another model/engineer)
-1. Run `flutter pub get`.
-2. Run `flutter pub run build_runner build --delete-conflicting-outputs` if generated files drift.
-3. Run `flutter analyze` and `flutter test`.
-4. Prioritize next enhancements from this baseline:
-   - stronger template-to-entry workflow
-   - richer validation per brew method
-   - charts/analytics
-   - cloud sync layer on top of existing repository contracts
+## Validation Workflow
+Use after changes:
+1. `flutter pub run build_runner build --delete-conflicting-outputs` (when schema/model changes)
+2. `flutter analyze`
+3. `flutter test`
