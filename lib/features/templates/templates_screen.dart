@@ -13,36 +13,14 @@ class TemplatesScreen extends ConsumerStatefulWidget {
 }
 
 class _TemplatesScreenState extends ConsumerState<TemplatesScreen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
+{
 
   @override
   Widget build(BuildContext context) {
     final templateRepo = ref.watch(templateRepositoryProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Recipe templates'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Global'),
-            Tab(text: 'Per coffee'),
-          ],
-        ),
-      ),
+      appBar: AppBar(title: const Text('Recipe templates')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           await _showCreateTemplateDialog(context);
@@ -57,28 +35,16 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen>
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          final templates = snapshot.data ?? [];
-          final global = templates.where((t) => t.template.scope == TemplateScope.global.name).toList();
-          final perCoffee = templates.where((t) => t.template.scope == TemplateScope.coffee.name).toList();
+          final templates = (snapshot.data ?? [])
+              .where((t) => t.template.scope == TemplateScope.global.name)
+              .toList(growable: false);
 
-          return TabBarView(
-            controller: _tabController,
-            children: [
-              _TemplateList(
-                items: global,
-                onDelete: (id) async {
-                  await templateRepo.delete(id);
-                  if (mounted) setState(() {});
-                },
-              ),
-              _TemplateList(
-                items: perCoffee,
-                onDelete: (id) async {
-                  await templateRepo.delete(id);
-                  if (mounted) setState(() {});
-                },
-              ),
-            ],
+          return _TemplateList(
+            items: templates,
+            onDelete: (id) async {
+              await templateRepo.delete(id);
+              if (mounted) setState(() {});
+            },
           );
         },
       ),
@@ -86,19 +52,15 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen>
   }
 
   Future<void> _showCreateTemplateDialog(BuildContext context) async {
-    final coffeeRepository = ref.read(coffeeRepositoryProvider);
     final templateRepository = ref.read(templateRepositoryProvider);
     final brewMethodRepository = ref.read(brewMethodRepositoryProvider);
-    final coffees = await coffeeRepository.list();
     final brewMethods = await brewMethodRepository.list();
 
     final nameController = TextEditingController();
     final doseController = TextEditingController();
     final waterController = TextEditingController();
     final tagsController = TextEditingController();
-    TemplateScope scope = TemplateScope.global;
     String method = brewMethods.isNotEmpty ? brewMethods.first.name : 'V60';
-    String? coffeeId;
 
     if (!context.mounted) return;
 
@@ -117,27 +79,6 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen>
                       controller: nameController,
                       decoration: const InputDecoration(labelText: 'Template name'),
                     ),
-                    DropdownButtonFormField<TemplateScope>(
-                      initialValue: scope,
-                      items: TemplateScope.values
-                          .map((e) => DropdownMenuItem(value: e, child: Text(e.name)))
-                          .toList(),
-                      onChanged: (v) => setDialogState(() => scope = v ?? scope),
-                    ),
-                    if (scope == TemplateScope.coffee)
-                      DropdownButtonFormField<String>(
-                        initialValue: coffeeId,
-                        hint: const Text('Select coffee'),
-                        items: coffees
-                            .map(
-                              (e) => DropdownMenuItem(
-                                value: e.coffee.id,
-                                child: Text('${e.coffee.name} - ${e.coffee.roaster}'),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (v) => setDialogState(() => coffeeId = v),
-                      ),
                     DropdownButtonFormField<String>(
                       initialValue: brewMethods.any((e) => e.name == method)
                           ? method
@@ -175,8 +116,8 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen>
                     if (nameController.text.trim().isEmpty) return;
                     await templateRepository.upsert(
                       name: nameController.text.trim(),
-                      scope: scope,
-                      coffeeId: coffeeId,
+                      scope: TemplateScope.global,
+                      coffeeId: null,
                       brewMethod: method,
                       defaultCoffeeDoseG: double.tryParse(doseController.text),
                       defaultWaterTotalG: double.tryParse(waterController.text),
@@ -212,7 +153,7 @@ class _TemplateList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (items.isEmpty) {
-      return const Center(child: Text('No templates in this scope.'));
+      return const Center(child: Text('No templates yet.'));
     }
 
     return ListView.builder(

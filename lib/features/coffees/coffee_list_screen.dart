@@ -16,6 +16,7 @@ class CoffeeListScreen extends ConsumerStatefulWidget {
 class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
   final TextEditingController _searchController = TextEditingController();
   CoffeeSortOption _sort = CoffeeSortOption.updatedAt;
+  bool _showSearch = false;
 
   @override
   void dispose() {
@@ -32,9 +33,16 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
         title: const Text('Coffee Journal'),
         actions: [
           IconButton(
-            tooltip: 'Templates',
-            onPressed: () => context.push('/templates'),
-            icon: const Icon(Icons.bookmark_outline),
+            tooltip: _showSearch ? 'Hide search' : 'Search',
+            onPressed: () {
+              setState(() {
+                _showSearch = !_showSearch;
+                if (!_showSearch && _searchController.text.isNotEmpty) {
+                  _searchController.clear();
+                }
+              });
+            },
+            icon: Icon(_showSearch ? Icons.close : Icons.search),
           ),
           IconButton(
             tooltip: 'Settings',
@@ -53,24 +61,25 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.search),
-                hintText: 'Search name, roaster, origin, tags',
-                suffixIcon: IconButton(
-                  onPressed: () {
-                    _searchController.clear();
-                    setState(() {});
-                  },
-                  icon: const Icon(Icons.clear),
+          if (_showSearch)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search),
+                  hintText: 'Search name, roaster, origin, tags',
+                  suffixIcon: IconButton(
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() {});
+                    },
+                    icon: const Icon(Icons.clear),
+                  ),
                 ),
+                onChanged: (_) => setState(() {}),
               ),
-              onChanged: (_) => setState(() {}),
             ),
-          ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
@@ -120,6 +129,7 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
                         subtitle: Text(
                           [
                             if (item.coffee.country != null) item.coffee.country,
+                            if (item.coffee.region != null) item.coffee.region,
                             if (item.coffee.varietal != null) item.coffee.varietal,
                             if (item.coffee.roastDate != null)
                               'Roast ${DateFormat.yMMMd().format(item.coffee.roastDate!)}',

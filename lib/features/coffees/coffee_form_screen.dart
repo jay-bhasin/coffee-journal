@@ -17,6 +17,7 @@ class _CoffeeFormScreenState extends ConsumerState<CoffeeFormScreen> {
   final _nameController = TextEditingController();
   final _roasterController = TextEditingController();
   final _countryController = TextEditingController();
+  final _regionController = TextEditingController();
   final _farmController = TextEditingController();
   final _varietalController = TextEditingController();
   final _processController = TextEditingController();
@@ -31,6 +32,7 @@ class _CoffeeFormScreenState extends ConsumerState<CoffeeFormScreen> {
     _nameController.dispose();
     _roasterController.dispose();
     _countryController.dispose();
+    _regionController.dispose();
     _farmController.dispose();
     _varietalController.dispose();
     _processController.dispose();
@@ -58,6 +60,7 @@ class _CoffeeFormScreenState extends ConsumerState<CoffeeFormScreen> {
             _nameController.text = item.coffee.name;
             _roasterController.text = item.coffee.roaster;
             _countryController.text = item.coffee.country ?? '';
+            _regionController.text = item.coffee.region ?? '';
             _farmController.text = item.coffee.farm ?? '';
             _varietalController.text = item.coffee.varietal ?? '';
             _processController.text = item.coffee.process ?? '';
@@ -85,6 +88,10 @@ class _CoffeeFormScreenState extends ConsumerState<CoffeeFormScreen> {
                 TextFormField(
                   controller: _countryController,
                   decoration: const InputDecoration(labelText: 'Country'),
+                ),
+                TextFormField(
+                  controller: _regionController,
+                  decoration: const InputDecoration(labelText: 'Region'),
                 ),
                 TextFormField(
                   controller: _farmController,
@@ -122,6 +129,7 @@ class _CoffeeFormScreenState extends ConsumerState<CoffeeFormScreen> {
                       name: _nameController.text.trim(),
                       roaster: _roasterController.text.trim(),
                       country: _countryController.text.trim().isEmpty ? null : _countryController.text.trim(),
+                      region: _regionController.text.trim().isEmpty ? null : _regionController.text.trim(),
                       farm: _farmController.text.trim().isEmpty ? null : _farmController.text.trim(),
                       varietal:
                           _varietalController.text.trim().isEmpty ? null : _varietalController.text.trim(),

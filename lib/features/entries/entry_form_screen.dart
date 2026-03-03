@@ -110,7 +110,20 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
     final brewTimeCalculator = ref.watch(brewTimeCalculatorProvider);
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.entryId == null ? 'New entry' : 'Edit entry')),
+      appBar: AppBar(
+        title: Text(widget.entryId == null ? 'New entry' : 'Edit entry'),
+        actions: [
+          IconButton(
+            tooltip: 'Save entry',
+            onPressed: () async {
+              final autoBrewTime =
+                  ref.read(brewTimeCalculatorProvider).calculateAutoBrewTimeSec(_steps);
+              await _saveEntry(repository, autoBrewTime);
+            },
+            icon: const Icon(Icons.save_outlined),
+          ),
+        ],
+      ),
       body: FutureBuilder<EntryRecord?>(
         future: _loadFuture,
         builder: (context, snapshot) {
@@ -354,7 +367,10 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
                     ),
                     TextButton.icon(
                       onPressed: () async {
-                        final step = await _showStepDialog(context);
+                        final step = await _showStepDialog(
+                          context,
+                          index: _steps.length,
+                        );
                         if (step != null) {
                           setState(() {
                             _steps = [..._steps, step.copyWith(index: _steps.length)];
@@ -392,36 +408,66 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
                       final step = _steps[index];
                       return Card(
                         key: ValueKey('step-${step.index}-${step.type.name}-$index'),
-                        child: ListTile(
-                          title: Text('${index + 1}. ${step.type.name}'),
-                          subtitle: Text(
-                            [
-                              if (step.waterG != null) '${step.waterG!.toStringAsFixed(1)}g water',
-                              if (step.startSec != null) 'start ${step.startSec}s',
-                              if (step.durationSec != null) 'dur ${step.durationSec}s',
-                              if (step.pressureBar != null) '${step.pressureBar!.toStringAsFixed(1)}bar',
-                              if (step.note != null) step.note,
-                            ].join(' • '),
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
+                        child: IntrinsicHeight(
+                          child: Row(
                             children: [
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline),
-                                onPressed: () {
-                                  setState(() {
-                                    _steps.removeAt(index);
-                                    _steps = _steps
-                                        .asMap()
-                                        .entries
-                                        .map((e) => e.value.copyWith(index: e.key))
-                                        .toList(growable: false);
-                                  });
-                                },
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                child: _StepTimelineMarker(
+                                  isFirst: index == 0,
+                                  isLast: index == _steps.length - 1,
+                                  startSec: step.startSec,
+                                ),
                               ),
-                              ReorderableDragStartListener(
-                                index: index,
-                                child: const Icon(Icons.drag_handle),
+                              Expanded(
+                                child: ListTile(
+                                  title: Text('${index + 1}. ${step.type.name}'),
+                                  subtitle: Text(
+                                    [
+                                      if (step.waterG != null) '${step.waterG!.toStringAsFixed(1)}g water',
+                                      if (step.startSec != null) 'start ${step.startSec}s',
+                                      if (step.durationSec != null) 'dur ${step.durationSec}s',
+                                      if (step.pressureBar != null) '${step.pressureBar!.toStringAsFixed(1)}bar',
+                                      if (step.note != null) step.note,
+                                    ].join(' • '),
+                                  ),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.edit_outlined),
+                                        onPressed: () async {
+                                          final edited = await _showStepDialog(
+                                            context,
+                                            initialStep: step,
+                                            index: index,
+                                          );
+                                          if (edited == null) return;
+                                          setState(() {
+                                            _steps[index] = edited.copyWith(index: index);
+                                          });
+                                        },
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete_outline),
+                                        onPressed: () {
+                                          setState(() {
+                                            _steps.removeAt(index);
+                                            _steps = _steps
+                                                .asMap()
+                                                .entries
+                                                .map((e) => e.value.copyWith(index: e.key))
+                                                .toList(growable: false);
+                                          });
+                                        },
+                                      ),
+                                      ReorderableDragStartListener(
+                                        index: index,
+                                        child: const Icon(Icons.drag_handle),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ],
                           ),
@@ -497,45 +543,7 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
                 ),
                 const SizedBox(height: 24),
                 FilledButton(
-                  onPressed: () async {
-                    if (!_formKey.currentState!.validate()) return;
-                    final sensory = SensoryNotes(
-                      aroma: _clean(_aromaController.text),
-                      flavor: _clean(_flavorController.text),
-                      acidity: _clean(_acidityController.text),
-                      sweetness: _clean(_sweetnessController.text),
-                      body: _clean(_bodyController.text),
-                      aftertaste: _clean(_aftertasteController.text),
-                      freeText: _clean(_sensoryFreeTextController.text),
-                    );
-
-                    await repository.upsert(
-                      id: widget.entryId,
-                      coffeeId: widget.coffeeId,
-                      brewAt: _brewAt,
-                      brewMethod: _method,
-                      isStarred: _isStarred,
-                      coffeeDoseG: double.parse(_coffeeDoseController.text),
-                      waterTotalG: double.parse(_waterController.text),
-                      waterTempC: double.tryParse(_tempController.text),
-                      grinder: _clean(_grinderController.text),
-                      grindSetting: _clean(_grindSettingController.text),
-                      yieldG: double.tryParse(_yieldController.text),
-                      pressureBar: double.tryParse(_pressureController.text),
-                      preinfusionSec: int.tryParse(_preinfusionController.text),
-                      brewTimeSecAuto: autoBrewTime,
-                      brewTimeSecManual: _brewTimeManual,
-                      sensoryJson: jsonEncode(sensory.toJson()),
-                      dialInNotes: _clean(_dialInController.text),
-                      miscNotes: _clean(_miscController.text),
-                      agitationLevel: _clean(_agitationController.text),
-                      drawdownSec: int.tryParse(_drawdownController.text),
-                      extractionOutcome: _extractionOutcome,
-                      steps: _steps,
-                      tags: _splitTags(_tagsController.text),
-                    );
-                    if (context.mounted) context.pop();
-                  },
+                  onPressed: () => _saveEntry(repository, autoBrewTime),
                   child: const Text('Save entry'),
                 ),
               ],
@@ -546,13 +554,20 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
     );
   }
 
-  Future<RecipeStepDraft?> _showStepDialog(BuildContext context) async {
-    RecipeStepType type = RecipeStepType.pour;
-    final waterController = TextEditingController();
-    final startController = TextEditingController();
-    final durationController = TextEditingController();
-    final noteController = TextEditingController();
-    final pressureController = TextEditingController();
+  Future<RecipeStepDraft?> _showStepDialog(
+    BuildContext context, {
+    RecipeStepDraft? initialStep,
+    required int index,
+  }) async {
+    RecipeStepType type = initialStep?.type ?? RecipeStepType.pour;
+    final waterController = TextEditingController(text: initialStep?.waterG?.toString() ?? '');
+    final startController = TextEditingController(text: initialStep?.startSec?.toString() ?? '');
+    final durationController =
+        TextEditingController(text: initialStep?.durationSec?.toString() ?? '');
+    final noteController = TextEditingController(text: initialStep?.note ?? '');
+    final pressureController =
+        TextEditingController(text: initialStep?.pressureBar?.toString() ?? '');
+    final isEditing = initialStep != null;
 
     return showDialog<RecipeStepDraft>(
       context: context,
@@ -560,7 +575,7 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
         return StatefulBuilder(
           builder: (context, setStateDialog) {
             return AlertDialog(
-              title: const Text('Add step'),
+              title: Text(isEditing ? 'Edit step' : 'Add step'),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -606,7 +621,7 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
                     Navigator.of(context).pop(
                       RecipeStepDraft(
                         type: type,
-                        index: _steps.length,
+                        index: index,
                         waterG: double.tryParse(waterController.text),
                         startSec: int.tryParse(startController.text),
                         durationSec: int.tryParse(durationController.text),
@@ -615,7 +630,7 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
                       ),
                     );
                   },
-                  child: const Text('Add'),
+                  child: Text(isEditing ? 'Save' : 'Add'),
                 ),
               ],
             );
@@ -648,5 +663,113 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
       return repository.getById(widget.duplicateFromEntryId!);
     }
     return Future.value(null);
+  }
+
+  Future<void> _saveEntry(EntryRepository repository, int autoBrewTime) async {
+    if (!_formKey.currentState!.validate()) return;
+    final sensory = SensoryNotes(
+      aroma: _clean(_aromaController.text),
+      flavor: _clean(_flavorController.text),
+      acidity: _clean(_acidityController.text),
+      sweetness: _clean(_sweetnessController.text),
+      body: _clean(_bodyController.text),
+      aftertaste: _clean(_aftertasteController.text),
+      freeText: _clean(_sensoryFreeTextController.text),
+    );
+
+    await repository.upsert(
+      id: widget.entryId,
+      coffeeId: widget.coffeeId,
+      brewAt: _brewAt,
+      brewMethod: _method,
+      isStarred: _isStarred,
+      coffeeDoseG: double.parse(_coffeeDoseController.text),
+      waterTotalG: double.parse(_waterController.text),
+      waterTempC: double.tryParse(_tempController.text),
+      grinder: _clean(_grinderController.text),
+      grindSetting: _clean(_grindSettingController.text),
+      yieldG: double.tryParse(_yieldController.text),
+      pressureBar: double.tryParse(_pressureController.text),
+      preinfusionSec: int.tryParse(_preinfusionController.text),
+      brewTimeSecAuto: autoBrewTime,
+      brewTimeSecManual: _brewTimeManual,
+      sensoryJson: jsonEncode(sensory.toJson()),
+      dialInNotes: _clean(_dialInController.text),
+      miscNotes: _clean(_miscController.text),
+      agitationLevel: _clean(_agitationController.text),
+      drawdownSec: int.tryParse(_drawdownController.text),
+      extractionOutcome: _extractionOutcome,
+      steps: _steps,
+      tags: _splitTags(_tagsController.text),
+    );
+    if (mounted) context.pop();
+  }
+}
+
+class _StepTimelineMarker extends StatelessWidget {
+  const _StepTimelineMarker({
+    required this.isFirst,
+    required this.isLast,
+    required this.startSec,
+  });
+
+  final bool isFirst;
+  final bool isLast;
+  final int? startSec;
+
+  @override
+  Widget build(BuildContext context) {
+    final lineColor = Theme.of(context).colorScheme.outlineVariant;
+    final dotColor = Theme.of(context).colorScheme.primary;
+
+    return SizedBox(
+      width: 68,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: 16,
+            child: Center(
+              child: Column(
+                children: [
+                  Expanded(
+                    child: Container(
+                      width: 2,
+                      color: isFirst ? Colors.transparent : lineColor,
+                    ),
+                  ),
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: dotColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  Expanded(
+                    child: Container(
+                      width: 2,
+                      color: isLast ? Colors.transparent : lineColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 44,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                startSec == null ? '-' : '${startSec}s',
+                style: Theme.of(context).textTheme.bodySmall,
+                textAlign: TextAlign.right,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

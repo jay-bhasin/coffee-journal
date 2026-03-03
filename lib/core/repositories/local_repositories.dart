@@ -486,13 +486,10 @@ class LocalTemplateRepository implements TemplateRepository {
 
   @override
   Future<List<TemplateRecord>> list({String? coffeeId}) async {
+    await _normalizeTemplateScope();
     final q = _db.select(_db.templates)
       ..orderBy([(tbl) => OrderingTerm.asc(tbl.name)]);
-    if (coffeeId != null) {
-      q.where(
-        (tbl) => tbl.scope.equals(TemplateScope.global.name) | tbl.coffeeId.equals(coffeeId),
-      );
-    }
+    q.where((tbl) => tbl.scope.equals(TemplateScope.global.name));
     final templates = await q.get();
 
     return Future.wait(templates.map((template) async {
@@ -517,6 +514,7 @@ class LocalTemplateRepository implements TemplateRepository {
     required List<RecipeStepDraft> steps,
     List<String> tags = const [],
   }) async {
+    await _normalizeTemplateScope();
     final now = DateTime.now();
     final entityId = id ?? _uuid.v4();
     final existing = await (_db.select(_db.templates)
@@ -527,8 +525,8 @@ class LocalTemplateRepository implements TemplateRepository {
           TemplatesCompanion(
             id: Value(entityId),
             name: Value(name),
-            scope: Value(scope.name),
-            coffeeId: Value(scope == TemplateScope.coffee ? coffeeId : null),
+            scope: Value(TemplateScope.global.name),
+            coffeeId: const Value(null),
             brewMethod: Value(brewMethod),
             defaultCoffeeDoseG: Value(defaultCoffeeDoseG),
             defaultWaterTotalG: Value(defaultWaterTotalG),
@@ -562,6 +560,17 @@ class LocalTemplateRepository implements TemplateRepository {
     }
 
     await _replaceTemplateTags(entityId, tags);
+  }
+
+  Future<void> _normalizeTemplateScope() async {
+    await (_db.update(_db.templates)
+          ..where((tbl) => tbl.scope.equals(TemplateScope.coffee.name)))
+        .write(
+      const TemplatesCompanion(
+        scope: Value('global'),
+        coffeeId: Value(null),
+      ),
+    );
   }
 
   Future<void> _replaceTemplateTags(String templateId, List<String> tags) async {
