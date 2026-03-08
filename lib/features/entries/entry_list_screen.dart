@@ -29,7 +29,10 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
     final templateRepository = ref.watch(templateRepositoryProvider);
     final scaler = ref.watch(recipeScalerProvider);
     final brewMethodsRepo = ref.watch(brewMethodRepositoryProvider);
-    final unitSystem = ref.watch(unitSystemProvider).valueOrNull ?? UnitSystem.metric;
+    final unitSystem = ref.watch(unitSystemProvider).maybeWhen(
+          data: (value) => value,
+          orElse: () => UnitSystem.metric,
+        );
     final unitConverter = ref.watch(unitConverterProvider);
     final coffeeFuture = coffeeRepository.getById(widget.coffeeId);
 

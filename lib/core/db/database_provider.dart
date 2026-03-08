@@ -56,17 +56,23 @@ final unitSystemProvider = FutureProvider((ref) {
   return ref.watch(settingsRepositoryProvider).getUnitSystem();
 });
 
-final themeModeProvider =
-    StateNotifierProvider<ThemeModeController, ThemeMode>((ref) {
-  return ThemeModeController(ref.watch(settingsRepositoryProvider));
-});
+final themeModeProvider = NotifierProvider<ThemeModeController, ThemeMode>(
+  ThemeModeController.new,
+);
 
-class ThemeModeController extends StateNotifier<ThemeMode> {
-  ThemeModeController(this._settingsRepository) : super(ThemeMode.light) {
-    _load();
+class ThemeModeController extends Notifier<ThemeMode> {
+  bool _initialized = false;
+
+  @override
+  ThemeMode build() {
+    if (!_initialized) {
+      _initialized = true;
+      _load();
+    }
+    return ThemeMode.light;
   }
 
-  final SettingsRepository _settingsRepository;
+  SettingsRepository get _settingsRepository => ref.read(settingsRepositoryProvider);
 
   Future<void> _load() async {
     final darkEnabled = await _settingsRepository.getDarkModeEnabled();

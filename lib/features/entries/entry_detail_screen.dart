@@ -28,7 +28,10 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
   Widget build(BuildContext context) {
     final repository = ref.watch(entryRepositoryProvider);
     final templateRepository = ref.watch(templateRepositoryProvider);
-    final unitSystem = ref.watch(unitSystemProvider).valueOrNull ?? UnitSystem.metric;
+    final unitSystem = ref.watch(unitSystemProvider).maybeWhen(
+          data: (value) => value,
+          orElse: () => UnitSystem.metric,
+        );
     final unitConverter = ref.watch(unitConverterProvider);
 
     return FutureBuilder<EntryRecord?>(
