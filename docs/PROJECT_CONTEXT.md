@@ -10,11 +10,12 @@ Current product focuses on:
 - Editable brew methods
 - Local backup/restore (JSON)
 - Settings for units + dark mode
+- Entry creation from blank or template
 
 ## Tech Stack
 - Flutter (Material 3)
-- `flutter_riverpod`
-- `go_router`
+- `flutter_riverpod` (v3.x)
+- `go_router` (v17.x)
 - `drift` + `sqlite3_flutter_libs`
 - `json_serializable` / `json_annotation`
 
@@ -28,11 +29,12 @@ Key tables:
 - `app_settings`
 - `brew_methods`
 
-Schema version: **2**.
+Schema version: **3**.
 
 Notable migration behavior:
 - Adds `brew_methods`
 - Migrates legacy brew-method names (`other`/`Other`) to `Unspecified`
+- Converts `coffees.altitude_m` from numeric (`REAL`) to text (`TEXT`) while preserving existing values
 
 ## Repository Layer
 Contracts and implementations:
@@ -47,10 +49,16 @@ Main repositories:
 - `SettingsRepository`
 - `BackupRepository`
 
+State providers:
+- `unitSystemProvider`: `FutureProvider`
+- `themeModeProvider`: Riverpod 3 `NotifierProvider` (`ThemeModeController extends Notifier<ThemeMode>`)
+
 Important logic:
 - Templates are normalized to **global only**
 - Deleting a brew method remaps related entries/templates to `Unspecified`
 - Backup includes brew methods
+- `TemplateRepository` now supports `getById(...)` for template editing and entry prefill
+- Backup import tolerates old numeric altitude values and normalizes them to text
 
 ## Navigation / Screens
 Routes in `lib/app/router.dart`.
@@ -62,6 +70,7 @@ Screens:
 - Entry form/edit: `lib/features/entries/entry_form_screen.dart`
 - Entry detail: `lib/features/entries/entry_detail_screen.dart`
 - Templates: `lib/features/templates/templates_screen.dart`
+- Template form/edit: `lib/features/templates/template_form_screen.dart`
 - Brew methods: `lib/features/brew_methods/brew_methods_screen.dart`
 - Settings: `lib/features/settings/settings_screen.dart`
 - Backup: `lib/features/settings/backup_screen.dart`
@@ -72,6 +81,35 @@ Screens:
 - Templates are global-only.
 - Template can be created from entry (entry list and detail menus).
 - Entry detail menu mirrors entry list menu actions.
+- New entry flow on entry list FAB is a chooser:
+  - Blank entry
+  - From template (template picker + prefilled entry form)
+
+## Dependency State (Latest Update)
+- Ran:
+  1. `flutter pub upgrade`
+  2. `flutter pub upgrade --major-versions`
+- Key direct dependency upgrades:
+  - `flutter_riverpod`: `2.6.1 -> 3.2.1`
+  - `go_router`: `16.3.0 -> 17.1.0`
+  - `sqlite3_flutter_libs`: `0.5.42 -> 0.6.0+eol`
+  - `build_runner`: `2.11.1 -> 2.12.2`
+- Compatibility changes applied:
+  - Replaced legacy Riverpod `StateNotifierProvider` usage for theme mode with `NotifierProvider`
+  - Replaced `AsyncValue.valueOrNull` call sites with `maybeWhen(...)` pattern
+- Post-upgrade validation:
+  - `flutter analyze` passes
+  - `flutter test` passes
+
+## Generated File Notes
+- After dependency upgrades, Flutter regenerated plugin registrant files for desktop targets.
+- Typical changed files include:
+  - `linux/flutter/generated_plugin_registrant.cc`
+  - `linux/flutter/generated_plugins.cmake`
+  - `macos/Flutter/GeneratedPluginRegistrant.swift`
+  - `windows/flutter/generated_plugin_registrant.cc`
+  - `windows/flutter/generated_plugins.cmake`
+- These are expected generated updates and can be committed when dependency/plugin graph changes.
 
 ## Settings
 Settings screen currently provides:
@@ -89,10 +127,15 @@ Backup/import UI is in dedicated `BackupScreen`.
 - Save via app-bar icon and bottom button share one save handler.
 - Recipe steps support add/edit/delete/reorder.
 - Timeline marker shown next to steps.
+- Supports seed loading from:
+  - Existing entry (edit)
+  - Duplicate source entry
+  - Template (`templateId` query param)
 
 ### Entry list
 - Filters/sort panel toggled from app bar.
-- Header shows entry count + sort chip + active filter chips.
+- Top header includes coffee metadata card (roaster + metadata/tags/notes).
+- Header shows entry count + sort chip + active method filter chip.
 - Entry card formatting:
   - Brew method shown as chip
   - Other metadata as regular text
@@ -111,6 +154,7 @@ Backup/import UI is in dedicated `BackupScreen`.
 - `Start`/`Dur` removed from step subtitle.
 - Hides empty fields.
 - Suppresses extraction outcome when `unknown`.
+- Template-name prompt uses controller-free dialog input to avoid disposed-controller crashes
 
 ## Formatting Rules (Current)
 Applied in entry list/detail:
@@ -131,6 +175,9 @@ Home screen currently includes:
 - Section header: `All Coffees (N)` + sort chip
 - Active context chips (search only)
 - Coffee card metadata chip now combines location as `Region, Country`
+- Coffee card metadata chips: `Region, Country`, `Varietal`, `Process`
+- Altitude is shown as plain text metadata (not a chip)
+- Tasting notes appear above tag text and use a slightly larger text style (`bodyMedium`)
 
 ## Known UX Rationale
 - No avatar circles on coffee tiles (avoids decorative clutter).
@@ -176,6 +223,7 @@ lib/
       backup_screen.dart
       settings_screen.dart
     templates/
+      template_form_screen.dart
       templates_screen.dart
   main.dart
 
@@ -188,6 +236,6 @@ test/
 
 ## Validation Workflow
 Use after changes:
-1. `flutter pub run build_runner build --delete-conflicting-outputs` (when schema/model changes)
+1. `dart run build_runner build --delete-conflicting-outputs` (when schema/model changes)
 2. `flutter analyze`
 3. `flutter test`

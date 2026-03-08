@@ -278,7 +278,7 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
       case CoffeeSortOption.roaster:
         return 'Roaster';
       case CoffeeSortOption.country:
-        return 'Country';
+        return 'Origin';
       case CoffeeSortOption.roastDate:
         return 'Roast date';
       case CoffeeSortOption.updatedAt:

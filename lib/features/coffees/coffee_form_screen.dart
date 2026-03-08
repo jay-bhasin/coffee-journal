@@ -2,6 +2,7 @@ import 'package:coffee_journal/core/db/database_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 class CoffeeFormScreen extends ConsumerStatefulWidget {
   const CoffeeFormScreen({super.key, this.coffeeId});
@@ -24,6 +25,7 @@ class _CoffeeFormScreenState extends ConsumerState<CoffeeFormScreen> {
   final _tastingController = TextEditingController();
   final _tagsController = TextEditingController();
   final _altitudeController = TextEditingController();
+  DateTime? _roastDate;
 
   bool _loaded = false;
 
@@ -66,6 +68,7 @@ class _CoffeeFormScreenState extends ConsumerState<CoffeeFormScreen> {
             _processController.text = item.coffee.process ?? '';
             _tastingController.text = item.coffee.tastingNotes ?? '';
             _altitudeController.text = item.coffee.altitudeM?.toString() ?? '';
+            _roastDate = item.coffee.roastDate;
             _tagsController.text = item.tags.join(', ');
             _loaded = true;
           }
@@ -109,6 +112,40 @@ class _CoffeeFormScreenState extends ConsumerState<CoffeeFormScreen> {
                   controller: _altitudeController,
                   decoration: const InputDecoration(labelText: 'Altitude'),
                 ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Roast date'),
+                  subtitle: Text(
+                    _roastDate == null ? 'Not set' : DateFormat.yMMMd().format(_roastDate!),
+                  ),
+                  trailing: Wrap(
+                    spacing: 8,
+                    children: [
+                      IconButton(
+                        tooltip: 'Pick roast date',
+                        onPressed: () async {
+                          final now = DateTime.now();
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _roastDate ?? now,
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime(now.year + 2),
+                          );
+                          if (picked != null && mounted) {
+                            setState(() => _roastDate = picked);
+                          }
+                        },
+                        icon: const Icon(Icons.calendar_today_outlined),
+                      ),
+                      if (_roastDate != null)
+                        IconButton(
+                          tooltip: 'Clear roast date',
+                          onPressed: () => setState(() => _roastDate = null),
+                          icon: const Icon(Icons.clear),
+                        ),
+                    ],
+                  ),
+                ),
                 TextFormField(
                   controller: _tastingController,
                   minLines: 2,
@@ -135,6 +172,7 @@ class _CoffeeFormScreenState extends ConsumerState<CoffeeFormScreen> {
                       process: _processController.text.trim().isEmpty ? null : _processController.text.trim(),
                       altitudeM:
                           _altitudeController.text.trim().isEmpty ? null : _altitudeController.text.trim(),
+                      roastDate: _roastDate,
                       tastingNotes:
                           _tastingController.text.trim().isEmpty ? null : _tastingController.text.trim(),
                       tags: _splitTags(_tagsController.text),

@@ -94,14 +94,17 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                     if (record == null) return const SizedBox.shrink();
                     final coffee = record.coffee;
                     final location = _formatLocation(coffee.region, coffee.country);
-                    final details = <String>[
+                    final metaChips = <String>[
                       if (!_isBlank(location)) location!,
-                      if (!_isBlank(coffee.process)) coffee.process!,
-                      if (!_isBlank(coffee.altitudeM)) 'Altitude: ${coffee.altitudeM!}',
                       if (!_isBlank(coffee.varietal)) coffee.varietal!,
-                      if (coffee.roastDate != null)
-                        'Roasted ${DateFormat.yMMMd().format(coffee.roastDate!)}',
+                      if (!_isBlank(coffee.process)) coffee.process!,
                     ];
+                    final detailLine = <String>[
+                      if (!_isBlank(coffee.altitudeM)) 'Altitude: ${coffee.altitudeM!}',
+                      if (coffee.roastDate != null)
+                        'Roast ${DateFormat.yMMMd().format(coffee.roastDate!)}',
+                      if (record.tags.isNotEmpty) 'Tags: ${record.tags.join(', ')}',
+                    ].join(' • ');
                     return Container(
                       margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
                       padding: const EdgeInsets.all(12),
@@ -119,42 +122,37 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                                 .titleMedium
                                 ?.copyWith(fontWeight: FontWeight.w700),
                           ),
-                          if (details.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Text(details.join(' • ')),
-                          ],
-                          if (record.tags.isNotEmpty) ...[
+                          if (metaChips.isNotEmpty) ...[
                             const SizedBox(height: 8),
-                            if (!_isBlank(coffee.tastingNotes)) ...[
-                              Text(
-                                coffee.tastingNotes!,
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
-                              const SizedBox(height: 8),
-                            ],
                             Wrap(
                               spacing: 6,
                               runSpacing: 6,
-                              children: record.tags
+                              children: metaChips
                                   .map(
-                                    (tag) => Chip(
+                                    (value) => Chip(
                                       visualDensity: VisualDensity.compact,
                                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                       labelPadding: const EdgeInsets.symmetric(horizontal: 6),
-                                      label: Text(tag),
+                                      label: Text(value),
                                     ),
                                   )
                                   .toList(growable: false),
                             ),
-                          ] else if (!_isBlank(coffee.tastingNotes)) ...[
+                          ],
+                          if (!_isBlank(coffee.tastingNotes)) ...[
                             const SizedBox(height: 8),
                             Text(
                               coffee.tastingNotes!,
                               maxLines: 3,
                               overflow: TextOverflow.ellipsis,
                               style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ],
+                          if (detailLine.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              detailLine,
+                              style: Theme.of(context).textTheme.bodySmall,
                             ),
                           ],
                         ],

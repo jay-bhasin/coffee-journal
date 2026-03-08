@@ -55,12 +55,37 @@ class LocalCoffeeRepository implements CoffeeRepository {
       case CoffeeSortOption.roastDate:
         q.orderBy([(tbl) => OrderingTerm.desc(tbl.roastDate)]);
       case CoffeeSortOption.updatedAt:
-        q.orderBy([(tbl) => OrderingTerm.desc(tbl.updatedAt)]);
+        q.orderBy([(tbl) => OrderingTerm.desc(tbl.name)]);
     }
 
     final coffees = await q.get();
+
+    List<Coffee> orderedCoffees = coffees;
+    if (sort == CoffeeSortOption.updatedAt) {
+      final entries = await _db.select(_db.entries).get();
+      final latestEntryByCoffee = <String, DateTime>{};
+      for (final entry in entries) {
+        final previous = latestEntryByCoffee[entry.coffeeId];
+        if (previous == null || entry.createdAt.isAfter(previous)) {
+          latestEntryByCoffee[entry.coffeeId] = entry.createdAt;
+        }
+      }
+
+      orderedCoffees = [...coffees]
+        ..sort((a, b) {
+          final aTime = latestEntryByCoffee[a.id];
+          final bTime = latestEntryByCoffee[b.id];
+          if (aTime == null && bTime == null) {
+            return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+          }
+          if (aTime == null) return 1;
+          if (bTime == null) return -1;
+          return bTime.compareTo(aTime);
+        });
+    }
+
     return Future.wait(
-      coffees.map((coffee) async {
+      orderedCoffees.map((coffee) async {
         final tags = await _tagsForCoffee(coffee.id);
         return CoffeeRecord(coffee: coffee, tags: tags);
       }),
