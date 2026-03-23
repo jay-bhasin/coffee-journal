@@ -42,7 +42,7 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
           future: coffeeFuture,
           builder: (context, snapshot) {
             final name = snapshot.data?.coffee.name;
-            return Text(name == null ? 'Entries' : '$name entries');
+            return Text(name == null ? 'Entries' : name);
           },
         ),
         actions: [
@@ -470,7 +470,7 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                               value: 'toggle_star',
                               child: Text(entry.isStarred ? 'Unstar' : 'Star'),
                             ),
-                            const PopupMenuItem(value: 'duplicate', child: Text('Duplicate as today')),
+                            const PopupMenuItem(value: 'duplicate', child: Text('Duplicate')),
                             const PopupMenuItem(value: 'edit', child: Text('Edit')),
                             const PopupMenuItem(
                               value: 'create_template',

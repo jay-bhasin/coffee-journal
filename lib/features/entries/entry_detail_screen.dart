@@ -58,7 +58,7 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Entry detail'),
+            title: Text(DateFormat.yMMMMd().add_Hm().format(entry.brewAt)),
             actions: [
               if (entry.isStarred)
                 const Padding(
@@ -174,10 +174,12 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              Text(
-                DateFormat.yMMMMd().add_Hm().format(entry.brewAt),
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
+              // Text(
+              //   DateFormat.yMMMMd().add_Hm().format(entry.brewAt),
+              //   style: Theme.of(context).textTheme.titleLarge,
+              // ),
+              Text('Recipe details', style: Theme.of(context).textTheme.titleMedium),
+
               const SizedBox(height: 8),
               Text('Method: ${entry.brewMethod}'),
               Text('Dose: ${_formatWeight(entry.coffeeDoseG)}'),
@@ -195,7 +197,7 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
               if (!_isBlank(entry.miscNotes)) Text('Misc notes: ${entry.miscNotes}'),
               if (item.tags.isNotEmpty) Text('Tags: ${item.tags.join(', ')}'),
               const Divider(height: 24),
-              Text('Recipe', style: Theme.of(context).textTheme.titleMedium),
+              Text('Steps', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
               ...item.steps.asMap().entries.map(
                 (entryWithIndex) => Card(

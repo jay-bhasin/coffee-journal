@@ -3,10 +3,15 @@ import 'package:coffee_journal/core/models/enums.dart';
 import 'package:coffee_journal/core/models/recipe_step_draft.dart';
 
 class CoffeeRecord {
-  const CoffeeRecord({required this.coffee, required this.tags});
+  const CoffeeRecord({
+    required this.coffee,
+    required this.tags,
+    this.lastEntryAt,
+  });
 
   final Coffee coffee;
   final List<String> tags;
+  final DateTime? lastEntryAt;
 }
 
 class EntryRecord {
@@ -50,10 +55,7 @@ class EntryFilter {
 }
 
 abstract class CoffeeRepository {
-  Future<List<CoffeeRecord>> list({
-    String query,
-    CoffeeSortOption sort,
-  });
+  Future<List<CoffeeRecord>> list({String query, CoffeeSortOption sort});
 
   Future<CoffeeRecord?> getById(String id);
 
@@ -144,11 +146,7 @@ abstract class BackupRepository {
 
 abstract class BrewMethodRepository {
   Future<List<BrewMethodOption>> list({bool includeInactive = false});
-  Future<void> upsert({
-    required String name,
-    bool isActive,
-    int? sortOrder,
-  });
+  Future<void> upsert({required String name, bool isActive, int? sortOrder});
   Future<void> delete(String name);
 }
 

@@ -22,11 +22,17 @@ class LocalCoffeeRepository implements CoffeeRepository {
 
   @override
   Future<CoffeeRecord?> getById(String id) async {
-    final coffee = await (_db.select(_db.coffees)..where((tbl) => tbl.id.equals(id)))
-        .getSingleOrNull();
+    final coffee = await (_db.select(
+      _db.coffees,
+    )..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
     if (coffee == null) return null;
     final tags = await _tagsForCoffee(id);
-    return CoffeeRecord(coffee: coffee, tags: tags);
+    final lastEntryByCoffee = await _latestEntryByCoffeeIds({id});
+    return CoffeeRecord(
+      coffee: coffee,
+      tags: tags,
+      lastEntryAt: lastEntryByCoffee[id],
+    );
   }
 
   @override
@@ -59,37 +65,58 @@ class LocalCoffeeRepository implements CoffeeRepository {
     }
 
     final coffees = await q.get();
+    final latestEntryByCoffee = await _latestEntryByCoffeeIds(
+      coffees.map((coffee) => coffee.id).toSet(),
+    );
 
     List<Coffee> orderedCoffees = coffees;
     if (sort == CoffeeSortOption.updatedAt) {
-      final entries = await _db.select(_db.entries).get();
-      final latestEntryByCoffee = <String, DateTime>{};
-      for (final entry in entries) {
-        final previous = latestEntryByCoffee[entry.coffeeId];
-        if (previous == null || entry.createdAt.isAfter(previous)) {
-          latestEntryByCoffee[entry.coffeeId] = entry.createdAt;
-        }
-      }
-
       orderedCoffees = [...coffees]
         ..sort((a, b) {
-          final aTime = latestEntryByCoffee[a.id];
-          final bTime = latestEntryByCoffee[b.id];
-          if (aTime == null && bTime == null) {
-            return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-          }
-          if (aTime == null) return 1;
-          if (bTime == null) return -1;
-          return bTime.compareTo(aTime);
+          return _compareCoffeeActivity(a, b, latestEntryByCoffee);
         });
     }
 
     return Future.wait(
       orderedCoffees.map((coffee) async {
         final tags = await _tagsForCoffee(coffee.id);
-        return CoffeeRecord(coffee: coffee, tags: tags);
+        return CoffeeRecord(
+          coffee: coffee,
+          tags: tags,
+          lastEntryAt: latestEntryByCoffee[coffee.id],
+        );
       }),
     );
+  }
+
+  Future<Map<String, DateTime>> _latestEntryByCoffeeIds(
+    Set<String> coffeeIds,
+  ) async {
+    if (coffeeIds.isEmpty) return const {};
+
+    final entries = await (_db.select(
+      _db.entries,
+    )..where((tbl) => tbl.coffeeId.isIn(coffeeIds))).get();
+    final latestEntryByCoffee = <String, DateTime>{};
+    for (final entry in entries) {
+      final previous = latestEntryByCoffee[entry.coffeeId];
+      if (previous == null || entry.brewAt.isAfter(previous)) {
+        latestEntryByCoffee[entry.coffeeId] = entry.brewAt;
+      }
+    }
+    return latestEntryByCoffee;
+  }
+
+  int _compareCoffeeActivity(
+    Coffee a,
+    Coffee b,
+    Map<String, DateTime> latestEntryByCoffee,
+  ) {
+    final aTime = latestEntryByCoffee[a.id] ?? a.updatedAt;
+    final bTime = latestEntryByCoffee[b.id] ?? b.updatedAt;
+    final byActivity = bTime.compareTo(aTime);
+    if (byActivity != 0) return byActivity;
+    return a.name.toLowerCase().compareTo(b.name.toLowerCase());
   }
 
   @override
@@ -125,11 +152,13 @@ class LocalCoffeeRepository implements CoffeeRepository {
       ...normalizedTags,
     ]);
 
-    final existing = await (_db.select(_db.coffees)
-          ..where((tbl) => tbl.id.equals(entityId)))
-        .getSingleOrNull();
+    final existing = await (_db.select(
+      _db.coffees,
+    )..where((tbl) => tbl.id.equals(entityId))).getSingleOrNull();
 
-    await _db.into(_db.coffees).insertOnConflictUpdate(
+    await _db
+        .into(_db.coffees)
+        .insertOnConflictUpdate(
           CoffeesCompanion(
             id: Value(entityId),
             name: Value(name),
@@ -154,15 +183,15 @@ class LocalCoffeeRepository implements CoffeeRepository {
   }
 
   Future<void> _replaceCoffeeTags(String coffeeId, List<String> tags) async {
-    await (_db.delete(_db.coffeeTags)..where((tbl) => tbl.coffeeId.equals(coffeeId)))
-        .go();
+    await (_db.delete(
+      _db.coffeeTags,
+    )..where((tbl) => tbl.coffeeId.equals(coffeeId))).go();
     for (final tag in tags) {
       final id = await _upsertTag(tag);
-      await _db.into(_db.coffeeTags).insert(
-            CoffeeTagsCompanion(
-              coffeeId: Value(coffeeId),
-              tagId: Value(id),
-            ),
+      await _db
+          .into(_db.coffeeTags)
+          .insert(
+            CoffeeTagsCompanion(coffeeId: Value(coffeeId), tagId: Value(id)),
             mode: InsertMode.insertOrIgnore,
           );
     }
@@ -171,18 +200,19 @@ class LocalCoffeeRepository implements CoffeeRepository {
   Future<String> _upsertTag(String raw) async {
     final name = raw.trim();
     final normalized = _searchIndexer.normalize(name);
-    final existing = await (_db.select(_db.tags)
-          ..where((tbl) => tbl.normalizedName.equals(normalized)))
-        .getSingleOrNull();
+    final existing = await (_db.select(
+      _db.tags,
+    )..where((tbl) => tbl.normalizedName.equals(normalized))).getSingleOrNull();
     if (existing != null) {
-      await (_db.update(_db.tags)..where((tbl) => tbl.id.equals(existing.id))).write(
-        TagsCompanion(usageCount: Value(existing.usageCount + 1)),
-      );
+      await (_db.update(_db.tags)..where((tbl) => tbl.id.equals(existing.id)))
+          .write(TagsCompanion(usageCount: Value(existing.usageCount + 1)));
       return existing.id;
     }
 
     final id = _uuid.v4();
-    await _db.into(_db.tags).insert(
+    await _db
+        .into(_db.tags)
+        .insert(
           TagsCompanion(
             id: Value(id),
             name: Value(name),
@@ -196,9 +226,7 @@ class LocalCoffeeRepository implements CoffeeRepository {
   Future<List<String>> _tagsForCoffee(String coffeeId) async {
     final rows = await (_db.select(_db.tags).join([
       innerJoin(_db.coffeeTags, _db.coffeeTags.tagId.equalsExp(_db.tags.id)),
-    ])
-          ..where(_db.coffeeTags.coffeeId.equals(coffeeId)))
-        .get();
+    ])..where(_db.coffeeTags.coffeeId.equals(coffeeId))).get();
 
     return rows.map((row) => row.readTable(_db.tags).name).toList();
   }
@@ -235,15 +263,10 @@ class LocalEntryRepository implements EntryRepository {
       preinfusionSec: existing.entry.preinfusionSec,
       brewTimeSecAuto: existing.entry.brewTimeSecAuto,
       brewTimeSecManual: existing.entry.brewTimeSecManual,
-      sensoryJson: existing.entry.sensoryJson,
       dialInNotes: existing.entry.dialInNotes,
       miscNotes: existing.entry.miscNotes,
       agitationLevel: existing.entry.agitationLevel,
-      drawdownSec: existing.entry.drawdownSec,
-      extractionOutcome: ExtractionOutcome.values.firstWhere(
-        (e) => e.name == existing.entry.extractionOutcome,
-        orElse: () => ExtractionOutcome.unknown,
-      ),
+      extractionOutcome: ExtractionOutcome.unknown,
       steps: existing.steps
           .map(
             (s) => RecipeStepDraft(
@@ -271,14 +294,16 @@ class LocalEntryRepository implements EntryRepository {
 
   @override
   Future<EntryRecord?> getById(String id) async {
-    final entry = await (_db.select(_db.entries)..where((tbl) => tbl.id.equals(id)))
-        .getSingleOrNull();
+    final entry = await (_db.select(
+      _db.entries,
+    )..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
     if (entry == null) return null;
 
-    final steps = await (_db.select(_db.entrySteps)
-          ..where((tbl) => tbl.entryId.equals(id))
-          ..orderBy([(tbl) => OrderingTerm.asc(tbl.stepIndex)]))
-        .get();
+    final steps =
+        await (_db.select(_db.entrySteps)
+              ..where((tbl) => tbl.entryId.equals(id))
+              ..orderBy([(tbl) => OrderingTerm.asc(tbl.stepIndex)]))
+            .get();
     final tags = await _tagsForEntry(id);
     return EntryRecord(entry: entry, steps: steps, tags: tags);
   }
@@ -307,15 +332,16 @@ class LocalEntryRepository implements EntryRepository {
 
     if (filter.tag != null && filter.tag!.trim().isNotEmpty) {
       final normalized = _searchIndexer.normalize(filter.tag!);
-      final tag = await (_db.select(_db.tags)
-            ..where((tbl) => tbl.normalizedName.equals(normalized)))
-          .getSingleOrNull();
+      final tag =
+          await (_db.select(_db.tags)
+                ..where((tbl) => tbl.normalizedName.equals(normalized)))
+              .getSingleOrNull();
       if (tag == null) {
         return [];
       }
-      final links = await (_db.select(_db.entryTags)
-            ..where((tbl) => tbl.tagId.equals(tag.id)))
-          .get();
+      final links = await (_db.select(
+        _db.entryTags,
+      )..where((tbl) => tbl.tagId.equals(tag.id))).get();
       if (links.isEmpty) {
         return [];
       }
@@ -340,14 +366,17 @@ class LocalEntryRepository implements EntryRepository {
     }
 
     final rows = await q.get();
-    return Future.wait(rows.map((entry) async {
-      final steps = await (_db.select(_db.entrySteps)
-            ..where((tbl) => tbl.entryId.equals(entry.id))
-            ..orderBy([(tbl) => OrderingTerm.asc(tbl.stepIndex)]))
-          .get();
-      final tags = await _tagsForEntry(entry.id);
-      return EntryRecord(entry: entry, steps: steps, tags: tags);
-    }));
+    return Future.wait(
+      rows.map((entry) async {
+        final steps =
+            await (_db.select(_db.entrySteps)
+                  ..where((tbl) => tbl.entryId.equals(entry.id))
+                  ..orderBy([(tbl) => OrderingTerm.asc(tbl.stepIndex)]))
+                .get();
+        final tags = await _tagsForEntry(entry.id);
+        return EntryRecord(entry: entry, steps: steps, tags: tags);
+      }),
+    );
   }
 
   @override
@@ -378,9 +407,9 @@ class LocalEntryRepository implements EntryRepository {
   }) async {
     final now = DateTime.now();
     final entityId = id ?? _uuid.v4();
-    final existing = await (_db.select(_db.entries)
-          ..where((tbl) => tbl.id.equals(entityId)))
-        .getSingleOrNull();
+    final existing = await (_db.select(
+      _db.entries,
+    )..where((tbl) => tbl.id.equals(entityId))).getSingleOrNull();
 
     final searchText = _searchIndexer.buildIndex([
       brewMethod,
@@ -392,7 +421,9 @@ class LocalEntryRepository implements EntryRepository {
       ...tags,
     ]);
 
-    await _db.into(_db.entries).insertOnConflictUpdate(
+    await _db
+        .into(_db.entries)
+        .insertOnConflictUpdate(
           EntriesCompanion(
             id: Value(entityId),
             coffeeId: Value(coffeeId),
@@ -421,9 +452,13 @@ class LocalEntryRepository implements EntryRepository {
           ),
         );
 
-    await (_db.delete(_db.entrySteps)..where((tbl) => tbl.entryId.equals(entityId))).go();
+    await (_db.delete(
+      _db.entrySteps,
+    )..where((tbl) => tbl.entryId.equals(entityId))).go();
     for (final step in steps) {
-      await _db.into(_db.entrySteps).insert(
+      await _db
+          .into(_db.entrySteps)
+          .insert(
             EntryStepsCompanion(
               id: Value(_uuid.v4()),
               entryId: Value(entityId),
@@ -447,15 +482,15 @@ class LocalEntryRepository implements EntryRepository {
   }
 
   Future<void> _replaceEntryTags(String entryId, List<String> tags) async {
-    await (_db.delete(_db.entryTags)..where((tbl) => tbl.entryId.equals(entryId)))
-        .go();
+    await (_db.delete(
+      _db.entryTags,
+    )..where((tbl) => tbl.entryId.equals(entryId))).go();
     for (final tag in tags) {
       final id = await _upsertTag(tag);
-      await _db.into(_db.entryTags).insert(
-            EntryTagsCompanion(
-              entryId: Value(entryId),
-              tagId: Value(id),
-            ),
+      await _db
+          .into(_db.entryTags)
+          .insert(
+            EntryTagsCompanion(entryId: Value(entryId), tagId: Value(id)),
             mode: InsertMode.insertOrIgnore,
           );
     }
@@ -464,18 +499,19 @@ class LocalEntryRepository implements EntryRepository {
   Future<String> _upsertTag(String raw) async {
     final name = raw.trim();
     final normalized = _searchIndexer.normalize(name);
-    final existing = await (_db.select(_db.tags)
-          ..where((tbl) => tbl.normalizedName.equals(normalized)))
-        .getSingleOrNull();
+    final existing = await (_db.select(
+      _db.tags,
+    )..where((tbl) => tbl.normalizedName.equals(normalized))).getSingleOrNull();
     if (existing != null) {
-      await (_db.update(_db.tags)..where((tbl) => tbl.id.equals(existing.id))).write(
-        TagsCompanion(usageCount: Value(existing.usageCount + 1)),
-      );
+      await (_db.update(_db.tags)..where((tbl) => tbl.id.equals(existing.id)))
+          .write(TagsCompanion(usageCount: Value(existing.usageCount + 1)));
       return existing.id;
     }
 
     final id = _uuid.v4();
-    await _db.into(_db.tags).insert(
+    await _db
+        .into(_db.tags)
+        .insert(
           TagsCompanion(
             id: Value(id),
             name: Value(name),
@@ -489,9 +525,7 @@ class LocalEntryRepository implements EntryRepository {
   Future<List<String>> _tagsForEntry(String entryId) async {
     final rows = await (_db.select(_db.tags).join([
       innerJoin(_db.entryTags, _db.entryTags.tagId.equalsExp(_db.tags.id)),
-    ])
-          ..where(_db.entryTags.entryId.equals(entryId)))
-        .get();
+    ])..where(_db.entryTags.entryId.equals(entryId))).get();
 
     return rows.map((row) => row.readTable(_db.tags).name).toList();
   }
@@ -517,26 +551,31 @@ class LocalTemplateRepository implements TemplateRepository {
     q.where((tbl) => tbl.scope.equals(TemplateScope.global.name));
     final templates = await q.get();
 
-    return Future.wait(templates.map((template) async {
-      final steps = await (_db.select(_db.templateSteps)
-            ..where((tbl) => tbl.templateId.equals(template.id))
-            ..orderBy([(tbl) => OrderingTerm.asc(tbl.stepIndex)]))
-          .get();
-      final tags = await _tagsForTemplate(template.id);
-      return TemplateRecord(template: template, steps: steps, tags: tags);
-    }));
+    return Future.wait(
+      templates.map((template) async {
+        final steps =
+            await (_db.select(_db.templateSteps)
+                  ..where((tbl) => tbl.templateId.equals(template.id))
+                  ..orderBy([(tbl) => OrderingTerm.asc(tbl.stepIndex)]))
+                .get();
+        final tags = await _tagsForTemplate(template.id);
+        return TemplateRecord(template: template, steps: steps, tags: tags);
+      }),
+    );
   }
 
   @override
   Future<TemplateRecord?> getById(String id) async {
     await _normalizeTemplateScope();
-    final template = await (_db.select(_db.templates)..where((tbl) => tbl.id.equals(id)))
-        .getSingleOrNull();
+    final template = await (_db.select(
+      _db.templates,
+    )..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
     if (template == null) return null;
-    final steps = await (_db.select(_db.templateSteps)
-          ..where((tbl) => tbl.templateId.equals(template.id))
-          ..orderBy([(tbl) => OrderingTerm.asc(tbl.stepIndex)]))
-        .get();
+    final steps =
+        await (_db.select(_db.templateSteps)
+              ..where((tbl) => tbl.templateId.equals(template.id))
+              ..orderBy([(tbl) => OrderingTerm.asc(tbl.stepIndex)]))
+            .get();
     final tags = await _tagsForTemplate(template.id);
     return TemplateRecord(template: template, steps: steps, tags: tags);
   }
@@ -556,11 +595,13 @@ class LocalTemplateRepository implements TemplateRepository {
     await _normalizeTemplateScope();
     final now = DateTime.now();
     final entityId = id ?? _uuid.v4();
-    final existing = await (_db.select(_db.templates)
-          ..where((tbl) => tbl.id.equals(entityId)))
-        .getSingleOrNull();
+    final existing = await (_db.select(
+      _db.templates,
+    )..where((tbl) => tbl.id.equals(entityId))).getSingleOrNull();
 
-    await _db.into(_db.templates).insertOnConflictUpdate(
+    await _db
+        .into(_db.templates)
+        .insertOnConflictUpdate(
           TemplatesCompanion(
             id: Value(entityId),
             name: Value(name),
@@ -569,16 +610,21 @@ class LocalTemplateRepository implements TemplateRepository {
             brewMethod: Value(brewMethod),
             defaultCoffeeDoseG: Value(defaultCoffeeDoseG),
             defaultWaterTotalG: Value(defaultWaterTotalG),
-            searchText: Value(_searchIndexer.buildIndex([name, brewMethod, ...tags])),
+            searchText: Value(
+              _searchIndexer.buildIndex([name, brewMethod, ...tags]),
+            ),
             createdAt: Value(existing?.createdAt ?? now),
             updatedAt: Value(now),
           ),
         );
 
-    await (_db.delete(_db.templateSteps)..where((tbl) => tbl.templateId.equals(entityId)))
-        .go();
+    await (_db.delete(
+      _db.templateSteps,
+    )..where((tbl) => tbl.templateId.equals(entityId))).go();
     for (final step in steps) {
-      await _db.into(_db.templateSteps).insert(
+      await _db
+          .into(_db.templateSteps)
+          .insert(
             TemplateStepsCompanion(
               id: Value(_uuid.v4()),
               templateId: Value(entityId),
@@ -602,23 +648,29 @@ class LocalTemplateRepository implements TemplateRepository {
   }
 
   Future<void> _normalizeTemplateScope() async {
-    await (_db.update(_db.templates)
-          ..where((tbl) => tbl.scope.equals(TemplateScope.coffee.name)))
-        .write(
-      const TemplatesCompanion(
-        scope: Value('global'),
-        coffeeId: Value(null),
-      ),
+    await (_db.update(
+      _db.templates,
+    )..where((tbl) => tbl.scope.equals(TemplateScope.coffee.name))).write(
+      const TemplatesCompanion(scope: Value('global'), coffeeId: Value(null)),
     );
   }
 
-  Future<void> _replaceTemplateTags(String templateId, List<String> tags) async {
-    await (_db.delete(_db.templateTags)..where((tbl) => tbl.templateId.equals(templateId)))
-        .go();
+  Future<void> _replaceTemplateTags(
+    String templateId,
+    List<String> tags,
+  ) async {
+    await (_db.delete(
+      _db.templateTags,
+    )..where((tbl) => tbl.templateId.equals(templateId))).go();
     for (final tag in tags) {
       final id = await _upsertTag(tag);
-      await _db.into(_db.templateTags).insert(
-            TemplateTagsCompanion(templateId: Value(templateId), tagId: Value(id)),
+      await _db
+          .into(_db.templateTags)
+          .insert(
+            TemplateTagsCompanion(
+              templateId: Value(templateId),
+              tagId: Value(id),
+            ),
             mode: InsertMode.insertOrIgnore,
           );
     }
@@ -627,18 +679,19 @@ class LocalTemplateRepository implements TemplateRepository {
   Future<String> _upsertTag(String raw) async {
     final name = raw.trim();
     final normalized = _searchIndexer.normalize(name);
-    final existing = await (_db.select(_db.tags)
-          ..where((tbl) => tbl.normalizedName.equals(normalized)))
-        .getSingleOrNull();
+    final existing = await (_db.select(
+      _db.tags,
+    )..where((tbl) => tbl.normalizedName.equals(normalized))).getSingleOrNull();
     if (existing != null) {
-      await (_db.update(_db.tags)..where((tbl) => tbl.id.equals(existing.id))).write(
-        TagsCompanion(usageCount: Value(existing.usageCount + 1)),
-      );
+      await (_db.update(_db.tags)..where((tbl) => tbl.id.equals(existing.id)))
+          .write(TagsCompanion(usageCount: Value(existing.usageCount + 1)));
       return existing.id;
     }
 
     final id = _uuid.v4();
-    await _db.into(_db.tags).insert(
+    await _db
+        .into(_db.tags)
+        .insert(
           TagsCompanion(
             id: Value(id),
             name: Value(name),
@@ -651,10 +704,11 @@ class LocalTemplateRepository implements TemplateRepository {
 
   Future<List<String>> _tagsForTemplate(String templateId) async {
     final rows = await (_db.select(_db.tags).join([
-      innerJoin(_db.templateTags, _db.templateTags.tagId.equalsExp(_db.tags.id)),
-    ])
-          ..where(_db.templateTags.templateId.equals(templateId)))
-        .get();
+      innerJoin(
+        _db.templateTags,
+        _db.templateTags.tagId.equalsExp(_db.tags.id),
+      ),
+    ])..where(_db.templateTags.templateId.equals(templateId))).get();
 
     return rows.map((row) => row.readTable(_db.tags).name).toList();
   }
@@ -703,13 +757,14 @@ class LocalBrewMethodRepository implements BrewMethodRepository {
     if (name == defaultMethodName) {
       return;
     }
-    await (_db.update(_db.entries)..where((tbl) => tbl.brewMethod.equals(name))).write(
-      const EntriesCompanion(brewMethod: Value(defaultMethodName)),
-    );
-    await (_db.update(_db.templates)..where((tbl) => tbl.brewMethod.equals(name))).write(
-      const TemplatesCompanion(brewMethod: Value(defaultMethodName)),
-    );
-    await (_db.delete(_db.brewMethods)..where((tbl) => tbl.name.equals(name))).go();
+    await (_db.update(_db.entries)..where((tbl) => tbl.brewMethod.equals(name)))
+        .write(const EntriesCompanion(brewMethod: Value(defaultMethodName)));
+    await (_db.update(_db.templates)
+          ..where((tbl) => tbl.brewMethod.equals(name)))
+        .write(const TemplatesCompanion(brewMethod: Value(defaultMethodName)));
+    await (_db.delete(
+      _db.brewMethods,
+    )..where((tbl) => tbl.name.equals(name))).go();
   }
 
   @override
@@ -742,15 +797,19 @@ class LocalBrewMethodRepository implements BrewMethodRepository {
     await _ensureDefaultMethod();
     final normalizedName = name.trim();
     if (normalizedName.isEmpty) return;
-    final existing = await (_db.select(_db.brewMethods)
-          ..where((tbl) => tbl.name.equals(normalizedName)))
-        .getSingleOrNull();
+    final existing = await (_db.select(
+      _db.brewMethods,
+    )..where((tbl) => tbl.name.equals(normalizedName))).getSingleOrNull();
     final maxOrder = _db.brewMethods.sortOrder.max();
-    final maxRes = await (_db.selectOnly(_db.brewMethods)..addColumns([maxOrder])).getSingleOrNull();
+    final maxRes = await (_db.selectOnly(
+      _db.brewMethods,
+    )..addColumns([maxOrder])).getSingleOrNull();
     final nextOrder = (maxRes?.read(maxOrder) ?? -1) + 1;
     final now = DateTime.now();
 
-    await _db.into(_db.brewMethods).insertOnConflictUpdate(
+    await _db
+        .into(_db.brewMethods)
+        .insertOnConflictUpdate(
           BrewMethodsCompanion(
             name: Value(normalizedName),
             sortOrder: Value(sortOrder ?? existing?.sortOrder ?? nextOrder),
@@ -763,27 +822,35 @@ class LocalBrewMethodRepository implements BrewMethodRepository {
 
   Future<void> _ensureDefaultMethod() async {
     final now = DateTime.now();
-    final legacyOther = await (_db.select(_db.brewMethods)
-          ..where((tbl) => tbl.name.equals('Other')))
-        .getSingleOrNull();
+    final legacyOther = await (_db.select(
+      _db.brewMethods,
+    )..where((tbl) => tbl.name.equals('Other'))).getSingleOrNull();
     if (legacyOther != null) {
-      await (_db.update(_db.entries)..where((tbl) => tbl.brewMethod.equals('Other'))).write(
-        const EntriesCompanion(brewMethod: Value(defaultMethodName)),
-      );
-      await (_db.update(_db.templates)..where((tbl) => tbl.brewMethod.equals('Other'))).write(
+      await (_db.update(_db.entries)
+            ..where((tbl) => tbl.brewMethod.equals('Other')))
+          .write(const EntriesCompanion(brewMethod: Value(defaultMethodName)));
+      await (_db.update(
+        _db.templates,
+      )..where((tbl) => tbl.brewMethod.equals('Other'))).write(
         const TemplatesCompanion(brewMethod: Value(defaultMethodName)),
       );
-      await (_db.delete(_db.brewMethods)..where((tbl) => tbl.name.equals('Other'))).go();
+      await (_db.delete(
+        _db.brewMethods,
+      )..where((tbl) => tbl.name.equals('Other'))).go();
     }
 
-    final existing = await (_db.select(_db.brewMethods)
-          ..where((tbl) => tbl.name.equals(defaultMethodName)))
-        .getSingleOrNull();
+    final existing = await (_db.select(
+      _db.brewMethods,
+    )..where((tbl) => tbl.name.equals(defaultMethodName))).getSingleOrNull();
     if (existing == null) {
       final maxOrder = _db.brewMethods.sortOrder.max();
-      final maxRes = await (_db.selectOnly(_db.brewMethods)..addColumns([maxOrder])).getSingleOrNull();
+      final maxRes = await (_db.selectOnly(
+        _db.brewMethods,
+      )..addColumns([maxOrder])).getSingleOrNull();
       final nextOrder = (maxRes?.read(maxOrder) ?? -1) + 1;
-      await _db.into(_db.brewMethods).insert(
+      await _db
+          .into(_db.brewMethods)
+          .insert(
             BrewMethodsCompanion(
               name: const Value(defaultMethodName),
               sortOrder: Value(nextOrder),
@@ -828,11 +895,18 @@ class LocalBackupRepository implements BackupRepository {
       'templates': templates.map(_templateToMap).toList(),
       'templateSteps': templateSteps.map(_templateStepToMap).toList(),
       'tags': tags.map(_tagToMap).toList(),
-      'coffeeTags': coffeeTags.map((e) => {'coffeeId': e.coffeeId, 'tagId': e.tagId}).toList(),
-      'entryTags': entryTags.map((e) => {'entryId': e.entryId, 'tagId': e.tagId}).toList(),
-      'templateTags':
-          templateTags.map((e) => {'templateId': e.templateId, 'tagId': e.tagId}).toList(),
-      'settings': settings.map((s) => {'key': s.key, 'value': s.value}).toList(),
+      'coffeeTags': coffeeTags
+          .map((e) => {'coffeeId': e.coffeeId, 'tagId': e.tagId})
+          .toList(),
+      'entryTags': entryTags
+          .map((e) => {'entryId': e.entryId, 'tagId': e.tagId})
+          .toList(),
+      'templateTags': templateTags
+          .map((e) => {'templateId': e.templateId, 'tagId': e.tagId})
+          .toList(),
+      'settings': settings
+          .map((s) => {'key': s.key, 'value': s.value})
+          .toList(),
       'brewMethods': brewMethods
           .map(
             (m) => {
@@ -863,7 +937,9 @@ class LocalBackupRepository implements BackupRepository {
         final newId = _uuid.v4();
         final oldId = map['id'] as String;
         tagMap[oldId] = newId;
-        await _db.into(_db.tags).insertOnConflictUpdate(
+        await _db
+            .into(_db.tags)
+            .insertOnConflictUpdate(
               TagsCompanion(
                 id: Value(newId),
                 name: Value(map['name'] as String),
@@ -878,7 +954,9 @@ class LocalBackupRepository implements BackupRepository {
         final newId = _uuid.v4();
         final oldId = map['id'] as String;
         idMap['coffee:$oldId'] = newId;
-        await _db.into(_db.coffees).insert(
+        await _db
+            .into(_db.coffees)
+            .insert(
               CoffeesCompanion(
                 id: Value(newId),
                 name: Value(map['name'] as String),
@@ -894,8 +972,12 @@ class LocalBackupRepository implements BackupRepository {
                 tastingNotes: Value(map['tastingNotes'] as String?),
                 isArchived: Value(map['isArchived'] as bool? ?? false),
                 searchText: Value(map['searchText'] as String? ?? ''),
-                createdAt: Value(_parseDate(map['createdAt']) ?? DateTime.now()),
-                updatedAt: Value(_parseDate(map['updatedAt']) ?? DateTime.now()),
+                createdAt: Value(
+                  _parseDate(map['createdAt']) ?? DateTime.now(),
+                ),
+                updatedAt: Value(
+                  _parseDate(map['updatedAt']) ?? DateTime.now(),
+                ),
               ),
             );
       }
@@ -905,7 +987,9 @@ class LocalBackupRepository implements BackupRepository {
         final newId = _uuid.v4();
         final oldId = map['id'] as String;
         idMap['entry:$oldId'] = newId;
-        await _db.into(_db.entries).insert(
+        await _db
+            .into(_db.entries)
+            .insert(
               EntriesCompanion(
                 id: Value(newId),
                 coffeeId: Value(idMap['coffee:${map['coffeeId']}']!),
@@ -927,40 +1011,62 @@ class LocalBackupRepository implements BackupRepository {
                 miscNotes: Value(map['miscNotes'] as String?),
                 agitationLevel: Value(map['agitationLevel'] as String?),
                 drawdownSec: Value(map['drawdownSec'] as int?),
-                extractionOutcome: Value(map['extractionOutcome'] as String? ?? 'unknown'),
+                extractionOutcome: Value(
+                  map['extractionOutcome'] as String? ?? 'unknown',
+                ),
                 searchText: Value(map['searchText'] as String? ?? ''),
-                createdAt: Value(_parseDate(map['createdAt']) ?? DateTime.now()),
-                updatedAt: Value(_parseDate(map['updatedAt']) ?? DateTime.now()),
+                createdAt: Value(
+                  _parseDate(map['createdAt']) ?? DateTime.now(),
+                ),
+                updatedAt: Value(
+                  _parseDate(map['updatedAt']) ?? DateTime.now(),
+                ),
               ),
             );
       }
 
-      for (final raw in (payload['templates'] as List<dynamic>? ?? <dynamic>[])) {
+      for (final raw
+          in (payload['templates'] as List<dynamic>? ?? <dynamic>[])) {
         final map = Map<String, dynamic>.from(raw as Map);
         final newId = _uuid.v4();
         final oldId = map['id'] as String;
         idMap['template:$oldId'] = newId;
-        await _db.into(_db.templates).insert(
+        await _db
+            .into(_db.templates)
+            .insert(
               TemplatesCompanion(
                 id: Value(newId),
                 name: Value(map['name'] as String),
                 scope: Value(map['scope'] as String),
-                coffeeId: Value(map['coffeeId'] == null
-                    ? null
-                    : idMap['coffee:${map['coffeeId']}']),
+                coffeeId: Value(
+                  map['coffeeId'] == null
+                      ? null
+                      : idMap['coffee:${map['coffeeId']}'],
+                ),
                 brewMethod: Value(map['brewMethod'] as String),
-                defaultCoffeeDoseG: Value((map['defaultCoffeeDoseG'] as num?)?.toDouble()),
-                defaultWaterTotalG: Value((map['defaultWaterTotalG'] as num?)?.toDouble()),
+                defaultCoffeeDoseG: Value(
+                  (map['defaultCoffeeDoseG'] as num?)?.toDouble(),
+                ),
+                defaultWaterTotalG: Value(
+                  (map['defaultWaterTotalG'] as num?)?.toDouble(),
+                ),
                 searchText: Value(map['searchText'] as String? ?? ''),
-                createdAt: Value(_parseDate(map['createdAt']) ?? DateTime.now()),
-                updatedAt: Value(_parseDate(map['updatedAt']) ?? DateTime.now()),
+                createdAt: Value(
+                  _parseDate(map['createdAt']) ?? DateTime.now(),
+                ),
+                updatedAt: Value(
+                  _parseDate(map['updatedAt']) ?? DateTime.now(),
+                ),
               ),
             );
       }
 
-      for (final raw in (payload['entrySteps'] as List<dynamic>? ?? <dynamic>[])) {
+      for (final raw
+          in (payload['entrySteps'] as List<dynamic>? ?? <dynamic>[])) {
         final map = Map<String, dynamic>.from(raw as Map);
-        await _db.into(_db.entrySteps).insert(
+        await _db
+            .into(_db.entrySteps)
+            .insert(
               EntryStepsCompanion(
                 id: Value(_uuid.v4()),
                 entryId: Value(idMap['entry:${map['entryId']}']!),
@@ -970,7 +1076,9 @@ class LocalBackupRepository implements BackupRepository {
                 durationSec: Value(map['durationSec'] as int?),
                 note: Value(map['note'] as String?),
                 waterG: Value((map['waterG'] as num?)?.toDouble()),
-                flowRateGPerSec: Value((map['flowRateGPerSec'] as num?)?.toDouble()),
+                flowRateGPerSec: Value(
+                  (map['flowRateGPerSec'] as num?)?.toDouble(),
+                ),
                 pressureBar: Value((map['pressureBar'] as num?)?.toDouble()),
                 count: Value(map['count'] as int?),
                 tool: Value(map['tool'] as String?),
@@ -980,9 +1088,12 @@ class LocalBackupRepository implements BackupRepository {
             );
       }
 
-      for (final raw in (payload['templateSteps'] as List<dynamic>? ?? <dynamic>[])) {
+      for (final raw
+          in (payload['templateSteps'] as List<dynamic>? ?? <dynamic>[])) {
         final map = Map<String, dynamic>.from(raw as Map);
-        await _db.into(_db.templateSteps).insert(
+        await _db
+            .into(_db.templateSteps)
+            .insert(
               TemplateStepsCompanion(
                 id: Value(_uuid.v4()),
                 templateId: Value(idMap['template:${map['templateId']}']!),
@@ -992,7 +1103,9 @@ class LocalBackupRepository implements BackupRepository {
                 durationSec: Value(map['durationSec'] as int?),
                 note: Value(map['note'] as String?),
                 waterG: Value((map['waterG'] as num?)?.toDouble()),
-                flowRateGPerSec: Value((map['flowRateGPerSec'] as num?)?.toDouble()),
+                flowRateGPerSec: Value(
+                  (map['flowRateGPerSec'] as num?)?.toDouble(),
+                ),
                 pressureBar: Value((map['pressureBar'] as num?)?.toDouble()),
                 count: Value(map['count'] as int?),
                 tool: Value(map['tool'] as String?),
@@ -1002,9 +1115,12 @@ class LocalBackupRepository implements BackupRepository {
             );
       }
 
-      for (final raw in (payload['coffeeTags'] as List<dynamic>? ?? <dynamic>[])) {
+      for (final raw
+          in (payload['coffeeTags'] as List<dynamic>? ?? <dynamic>[])) {
         final map = Map<String, dynamic>.from(raw as Map);
-        await _db.into(_db.coffeeTags).insert(
+        await _db
+            .into(_db.coffeeTags)
+            .insert(
               CoffeeTagsCompanion(
                 coffeeId: Value(idMap['coffee:${map['coffeeId']}']!),
                 tagId: Value(tagMap[map['tagId'] as String]!),
@@ -1013,9 +1129,12 @@ class LocalBackupRepository implements BackupRepository {
             );
       }
 
-      for (final raw in (payload['entryTags'] as List<dynamic>? ?? <dynamic>[])) {
+      for (final raw
+          in (payload['entryTags'] as List<dynamic>? ?? <dynamic>[])) {
         final map = Map<String, dynamic>.from(raw as Map);
-        await _db.into(_db.entryTags).insert(
+        await _db
+            .into(_db.entryTags)
+            .insert(
               EntryTagsCompanion(
                 entryId: Value(idMap['entry:${map['entryId']}']!),
                 tagId: Value(tagMap[map['tagId'] as String]!),
@@ -1024,9 +1143,12 @@ class LocalBackupRepository implements BackupRepository {
             );
       }
 
-      for (final raw in (payload['templateTags'] as List<dynamic>? ?? <dynamic>[])) {
+      for (final raw
+          in (payload['templateTags'] as List<dynamic>? ?? <dynamic>[])) {
         final map = Map<String, dynamic>.from(raw as Map);
-        await _db.into(_db.templateTags).insert(
+        await _db
+            .into(_db.templateTags)
+            .insert(
               TemplateTagsCompanion(
                 templateId: Value(idMap['template:${map['templateId']}']!),
                 tagId: Value(tagMap[map['tagId'] as String]!),
@@ -1035,23 +1157,27 @@ class LocalBackupRepository implements BackupRepository {
             );
       }
 
-      for (final raw in (payload['brewMethods'] as List<dynamic>? ?? <dynamic>[])) {
+      for (final raw
+          in (payload['brewMethods'] as List<dynamic>? ?? <dynamic>[])) {
         final map = Map<String, dynamic>.from(raw as Map);
-        await _db.into(_db.brewMethods).insertOnConflictUpdate(
+        await _db
+            .into(_db.brewMethods)
+            .insertOnConflictUpdate(
               BrewMethodsCompanion(
                 name: Value(map['name'] as String),
                 sortOrder: Value(map['sortOrder'] as int? ?? 0),
                 isActive: Value(map['isActive'] as bool? ?? true),
-                createdAt: Value(_parseDate(map['createdAt']) ?? DateTime.now()),
-                updatedAt: Value(_parseDate(map['updatedAt']) ?? DateTime.now()),
+                createdAt: Value(
+                  _parseDate(map['createdAt']) ?? DateTime.now(),
+                ),
+                updatedAt: Value(
+                  _parseDate(map['updatedAt']) ?? DateTime.now(),
+                ),
               ),
             );
       }
 
-      await _db.upsertSetting(
-        'import_last_id_map',
-        jsonEncode(idMap),
-      );
+      await _db.upsertSetting('import_last_id_map', jsonEncode(idMap));
     });
   }
 
@@ -1062,9 +1188,12 @@ class LocalBackupRepository implements BackupRepository {
       throw StateError('Unsupported schemaVersion: $version');
     }
 
-    final coffees = (payload['coffees'] as List<dynamic>? ?? <dynamic>[]).length;
-    final entries = (payload['entries'] as List<dynamic>? ?? <dynamic>[]).length;
-    final templates = (payload['templates'] as List<dynamic>? ?? <dynamic>[]).length;
+    final coffees =
+        (payload['coffees'] as List<dynamic>? ?? <dynamic>[]).length;
+    final entries =
+        (payload['entries'] as List<dynamic>? ?? <dynamic>[]).length;
+    final templates =
+        (payload['templates'] as List<dynamic>? ?? <dynamic>[]).length;
     final tags = (payload['tags'] as List<dynamic>? ?? <dynamic>[]).length;
 
     final conflictCount = await _countConflicts(payload);
@@ -1083,20 +1212,23 @@ class LocalBackupRepository implements BackupRepository {
 
     for (final raw in payload['coffees'] as List<dynamic>? ?? <dynamic>[]) {
       final id = (raw as Map)['id'] as String;
-      final existing = await (_db.select(_db.coffees)..where((tbl) => tbl.id.equals(id)))
-          .getSingleOrNull();
+      final existing = await (_db.select(
+        _db.coffees,
+      )..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
       if (existing != null) conflicts++;
     }
     for (final raw in payload['entries'] as List<dynamic>? ?? <dynamic>[]) {
       final id = (raw as Map)['id'] as String;
-      final existing = await (_db.select(_db.entries)..where((tbl) => tbl.id.equals(id)))
-          .getSingleOrNull();
+      final existing = await (_db.select(
+        _db.entries,
+      )..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
       if (existing != null) conflicts++;
     }
     for (final raw in payload['templates'] as List<dynamic>? ?? <dynamic>[]) {
       final id = (raw as Map)['id'] as String;
-      final existing = await (_db.select(_db.templates)..where((tbl) => tbl.id.equals(id)))
-          .getSingleOrNull();
+      final existing = await (_db.select(
+        _db.templates,
+      )..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
       if (existing != null) conflicts++;
     }
 

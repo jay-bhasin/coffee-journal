@@ -88,7 +88,9 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
                           child: Material(
                             elevation: 1,
                             borderRadius: BorderRadius.circular(16),
-                            color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHigh,
                             child: TextField(
                               controller: _searchController,
                               decoration: InputDecoration(
@@ -102,7 +104,9 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
                                   },
                                   icon: const Icon(Icons.clear),
                                 ),
-                                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
                               ),
                               onChanged: (_) => setState(() {}),
                             ),
@@ -149,7 +153,8 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
                           ),
                           const Spacer(),
                           PopupMenuButton<CoffeeSortOption>(
-                            onSelected: (value) => setState(() => _sort = value),
+                            onSelected: (value) =>
+                                setState(() => _sort = value),
                             itemBuilder: (context) => CoffeeSortOption.values
                                 .map(
                                   (e) => PopupMenuItem(
@@ -160,8 +165,11 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
                                 .toList(),
                             child: Chip(
                               visualDensity: VisualDensity.compact,
-                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              labelPadding: const EdgeInsets.symmetric(horizontal: 6),
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                              labelPadding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                              ),
                               avatar: const Icon(Icons.sort, size: 18),
                               label: Text(_sortLabel(_sort)),
                             ),
@@ -178,9 +186,14 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
                             if (_searchController.text.trim().isNotEmpty)
                               Chip(
                                 visualDensity: VisualDensity.compact,
-                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                labelPadding: const EdgeInsets.symmetric(horizontal: 6),
-                                label: Text('Search: ${_searchController.text.trim()}'),
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                                labelPadding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                ),
+                                label: Text(
+                                  'Search: ${_searchController.text.trim()}',
+                                ),
                                 onDeleted: () {
                                   _searchController.clear();
                                   setState(() {});
@@ -220,7 +233,9 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
                             if (mounted) setState(() {});
                           },
                           onEdit: () async {
-                            await context.push('/coffee/${item.coffee.id}/edit');
+                            await context.push(
+                              '/coffee/${item.coffee.id}/edit',
+                            );
                             if (mounted) setState(() {});
                           },
                           onDelete: () async {
@@ -282,7 +297,7 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
       case CoffeeSortOption.roastDate:
         return 'Roast date';
       case CoffeeSortOption.updatedAt:
-        return 'Recently updated';
+        return 'Recent activity';
     }
   }
 }
@@ -302,10 +317,7 @@ class _HomeData {
 }
 
 class _MetricTile extends StatelessWidget {
-  const _MetricTile({
-    required this.label,
-    required this.value,
-  });
+  const _MetricTile({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -325,9 +337,9 @@ class _MetricTile extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             value,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -385,9 +397,7 @@ class _CoffeeCard extends StatelessWidget {
                       children: [
                         Text(
                           item.coffee.name,
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
+                          style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 2),
@@ -423,8 +433,11 @@ class _CoffeeCard extends StatelessWidget {
                       .map(
                         (chip) => Chip(
                           visualDensity: VisualDensity.compact,
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          labelPadding: const EdgeInsets.symmetric(horizontal: 6),
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          labelPadding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                          ),
                           label: Text(chip),
                         ),
                       )
@@ -444,9 +457,14 @@ class _CoffeeCard extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 [
-                  if (_notBlank(item.coffee.altitudeM)) 'Altitude: ${item.coffee.altitudeM!}',
+                  if (item.lastEntryAt != null)
+                    'Last entry ${DateFormat.yMMMd().format(item.lastEntryAt!)}'
+                  else
+                    'Last updated ${DateFormat.yMMMd().format(item.coffee.updatedAt)}',
+                  // if (_notBlank(item.coffee.altitudeM))
+                  //   'Altitude: ${item.coffee.altitudeM!}',
                   if (item.coffee.roastDate != null)
-                    'Roast ${DateFormat.yMMMd().format(item.coffee.roastDate!)}',
+                    'Roasted ${DateFormat.yMMMd().format(item.coffee.roastDate!)}',
                   if (item.tags.isNotEmpty) 'Tags: ${item.tags.join(', ')}',
                 ].join(' • '),
                 style: Theme.of(context).textTheme.bodySmall,
@@ -462,10 +480,7 @@ class _CoffeeCard extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({
-    required this.hasQuery,
-    required this.onAddCoffee,
-  });
+  const _EmptyState({required this.hasQuery, required this.onAddCoffee});
 
   final bool hasQuery;
   final Future<void> Function() onAddCoffee;
