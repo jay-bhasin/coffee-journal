@@ -1,8 +1,9 @@
 import 'package:coffee_journal/core/db/database_provider.dart';
 import 'package:coffee_journal/core/models/enums.dart';
-import 'package:coffee_journal/core/models/recipe_step_draft.dart';
 import 'package:coffee_journal/core/repositories/contracts.dart';
-import 'package:coffee_journal/core/utils/unit_converter.dart';
+import 'package:coffee_journal/core/utils/display_formatters.dart';
+import 'package:coffee_journal/features/coffees/widgets/coffee_summary_card.dart';
+import 'package:coffee_journal/features/entries/entry_actions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -41,8 +42,7 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
         title: FutureBuilder(
           future: coffeeFuture,
           builder: (context, snapshot) {
-            final name = snapshot.data?.coffee.name;
-            return Text(name == null ? 'Entries' : name);
+            return const Text('Entries');
           },
         ),
         actions: [
@@ -92,72 +92,7 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                   builder: (context, snapshot) {
                     final record = snapshot.data;
                     if (record == null) return const SizedBox.shrink();
-                    final coffee = record.coffee;
-                    final location = _formatLocation(coffee.region, coffee.country);
-                    final metaChips = <String>[
-                      if (!_isBlank(location)) location!,
-                      if (!_isBlank(coffee.varietal)) coffee.varietal!,
-                      if (!_isBlank(coffee.process)) coffee.process!,
-                    ];
-                    final detailLine = <String>[
-                      if (!_isBlank(coffee.altitudeM)) 'Altitude: ${coffee.altitudeM!}',
-                      if (coffee.roastDate != null)
-                        'Roast ${DateFormat.yMMMd().format(coffee.roastDate!)}',
-                      if (record.tags.isNotEmpty) 'Tags: ${record.tags.join(', ')}',
-                    ].join(' • ');
-                    return Container(
-                      margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceContainerHigh,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            coffee.roaster,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w700),
-                          ),
-                          if (metaChips.isNotEmpty) ...[
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 6,
-                              runSpacing: 6,
-                              children: metaChips
-                                  .map(
-                                    (value) => Chip(
-                                      visualDensity: VisualDensity.compact,
-                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                      labelPadding: const EdgeInsets.symmetric(horizontal: 6),
-                                      label: Text(value),
-                                    ),
-                                  )
-                                  .toList(growable: false),
-                            ),
-                          ],
-                          if (!_isBlank(coffee.tastingNotes)) ...[
-                            const SizedBox(height: 8),
-                            Text(
-                              coffee.tastingNotes!,
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                          ],
-                          if (detailLine.isNotEmpty) ...[
-                            const SizedBox(height: 8),
-                            Text(
-                              detailLine,
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ],
-                        ],
-                      ),
-                    );
+                    return CoffeeSummaryCard(record: record);
                   },
                 ),
               ),
@@ -286,12 +221,18 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                         waterTotalG: entry.waterTotalG,
                       );
                       final brewTime = entry.brewTimeSecManual ?? entry.brewTimeSecAuto;
-                      final tempLabel = _formatTemperature(
+                      final tempLabel = DisplayFormatters.formatTemperature(
                         entry.waterTempC,
                         unitSystem,
                         unitConverter,
                       );
-                      final grinderLabel = _formatGrinder(entry.grinder, entry.grindSetting);
+                      final grinderLabel = DisplayFormatters.formatGrinder(
+                        entry.grinder,
+                        entry.grindSetting,
+                      );
+                      final extractionOutcome = DisplayFormatters.formatExtractionOutcome(
+                        entry.extractionOutcome
+                      );
 
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 6),
@@ -301,101 +242,77 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                             borderRadius: BorderRadius.circular(18),
                           ),
                           child: ListTile(
-                            contentPadding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+                            contentPadding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
                             title: Text(
                               DateFormat.yMMMd().add_Hm().format(entry.brewAt),
                               style: Theme.of(context)
                                   .textTheme
-                                  .titleSmall
+                                  .titleMedium
                                   ?.copyWith(fontWeight: FontWeight.w700),
                             ),
                             subtitle: Padding(
-                              padding: const EdgeInsets.only(top: 4),
+                              padding: const EdgeInsets.only(top: 6),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    '${_formatWeight(entry.coffeeDoseG)} / ${_formatWeight(entry.waterTotalG)} '
+                                    '${DisplayFormatters.formatWeight(entry.coffeeDoseG)} / '
+                                    '${DisplayFormatters.formatWeight(entry.waterTotalG)} '
                                     '(1:${ratio.toStringAsFixed(1)})',
                                   ),
                                   Text(
                                     <String?>[
                                       tempLabel,
                                       grinderLabel,
-                                      _formatDuration(brewTime),
+                                      DisplayFormatters.formatDuration(brewTime),
                                     ].whereType<String>().join(' • '),
                                   ),
-                                  const SizedBox(height: 6),
-                                  Chip(
-                                    visualDensity: VisualDensity.compact,
-                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                    labelPadding: const EdgeInsets.symmetric(horizontal: 6),
-                                    label: Text(entry.brewMethod),
-                                  ),
+                                  const SizedBox(height: 10),
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 6,
+                                    children: [
+                                      Chip(
+                                        visualDensity: VisualDensity.compact,
+                                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        labelPadding: const EdgeInsets.symmetric(horizontal: 6),
+                                        label: Text(entry.brewMethod),
+                                      ),
+                                      if (entry.extractionOutcome != ExtractionOutcome.unknown.name)
+                                        Chip(
+                                          visualDensity: VisualDensity.compact,
+                                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                          labelPadding: const EdgeInsets.symmetric(horizontal: 6),
+                                          avatar: Icon(DisplayFormatters.extractionOutcomeIcon(entry.extractionOutcome), size: 18),
+                                          label: Text(extractionOutcome),
+                                        ),
+                                    ],
+                                  )
                                 ],
                               ),
                             ),
-                            leading: entry.isStarred
-                                ? const Icon(Icons.star, color: Colors.amber)
-                                : const Icon(Icons.coffee),
+                            leading: IconButton(
+                              tooltip: entry.isStarred ? 'Unstar entry' : 'Star entry',
+                              onPressed: () async {
+                                await EntryActions.toggleStar(entryRepository, record);
+                                if (mounted) setState(() {});
+                              },
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 32,
+                                minHeight: 32,
+                              ),
+                              visualDensity: VisualDensity.compact,
+                              icon: Icon(
+                                entry.isStarred ? Icons.star : Icons.star_border,
+                                color: entry.isStarred ? Colors.amber : null,
+                              ),
+                            ),
                             trailing: PopupMenuButton<String>(
                           onSelected: (v) async {
                             switch (v) {
-                              case 'toggle_star':
-                                await entryRepository.upsert(
-                                  id: entry.id,
-                                  coffeeId: entry.coffeeId,
-                                  brewAt: entry.brewAt,
-                                  brewMethod: entry.brewMethod,
-                                  isStarred: !entry.isStarred,
-                                  coffeeDoseG: entry.coffeeDoseG,
-                                  waterTotalG: entry.waterTotalG,
-                                  waterTempC: entry.waterTempC,
-                                  grinder: entry.grinder,
-                                  grindSetting: entry.grindSetting,
-                                  yieldG: entry.yieldG,
-                                  pressureBar: entry.pressureBar,
-                                  preinfusionSec: entry.preinfusionSec,
-                                  brewTimeSecAuto: entry.brewTimeSecAuto,
-                                  brewTimeSecManual: entry.brewTimeSecManual,
-                                  sensoryJson: entry.sensoryJson,
-                                  dialInNotes: entry.dialInNotes,
-                                  miscNotes: entry.miscNotes,
-                                  agitationLevel: entry.agitationLevel,
-                                  drawdownSec: entry.drawdownSec,
-                                  extractionOutcome: ExtractionOutcome.values.firstWhere(
-                                    (e) => e.name == entry.extractionOutcome,
-                                    orElse: () => ExtractionOutcome.unknown,
-                                  ),
-                                  steps: record.steps
-                                      .map(
-                                        (s) => RecipeStepDraft(
-                                          type: RecipeStepType.values.firstWhere(
-                                            (e) => e.name == s.type,
-                                            orElse: () => RecipeStepType.custom,
-                                          ),
-                                          index: s.stepIndex,
-                                          startSec: s.startSec,
-                                          durationSec: s.durationSec,
-                                          note: s.note,
-                                          waterG: s.waterG,
-                                          flowRateGPerSec: s.flowRateGPerSec,
-                                          pressureBar: s.pressureBar,
-                                          count: s.count,
-                                          tool: s.tool,
-                                          label: s.label,
-                                          jsonPayload: s.jsonPayload,
-                                        ),
-                                      )
-                                      .toList(),
-                                  tags: record.tags,
-                                );
-                                break;
                               case 'duplicate':
-                                await entryRepository.duplicateEntryToNewDay(
-                                  entry.id,
-                                  DateTime.now(),
-                                );
+                                await EntryActions.duplicateAsToday(entryRepository, entry.id);
                                 break;
                               case 'edit':
                                 if (!context.mounted) return;
@@ -410,27 +327,7 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                                       '${entry.brewMethod} ${DateFormat.yMMMd().format(entry.brewAt)}';
                                   final name = await _promptTemplateName(context, defaultName);
                                   if (name == null || name.trim().isEmpty) break;
-                                  final steps = record.steps
-                                      .map(
-                                        (s) => RecipeStepDraft(
-                                          type: RecipeStepType.values.firstWhere(
-                                            (e) => e.name == s.type,
-                                            orElse: () => RecipeStepType.custom,
-                                          ),
-                                          index: s.stepIndex,
-                                          startSec: s.startSec,
-                                          durationSec: s.durationSec,
-                                          note: s.note,
-                                          waterG: s.waterG,
-                                          flowRateGPerSec: s.flowRateGPerSec,
-                                          pressureBar: s.pressureBar,
-                                          count: s.count,
-                                          tool: s.tool,
-                                          label: s.label,
-                                          jsonPayload: s.jsonPayload,
-                                        ),
-                                      )
-                                      .toList(growable: false);
+                                  final steps = EntryActions.stepDraftsFromSteps(record.steps);
                                   final tags = record.tags
                                       .map((e) => e.trim())
                                       .where((e) => e.isNotEmpty)
@@ -466,10 +363,6 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                             if (mounted) setState(() {});
                           },
                           itemBuilder: (context) => [
-                            PopupMenuItem(
-                              value: 'toggle_star',
-                              child: Text(entry.isStarred ? 'Unstar' : 'Star'),
-                            ),
                             const PopupMenuItem(value: 'duplicate', child: Text('Duplicate')),
                             const PopupMenuItem(value: 'edit', child: Text('Edit')),
                             const PopupMenuItem(
@@ -508,48 +401,6 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
         return 'Method';
     }
   }
-
-  String _formatDuration(int seconds) {
-    final minutes = seconds ~/ 60;
-    final secs = seconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
-  }
-
-  String _formatWeight(double grams) => '${grams.toStringAsFixed(1)} g';
-
-  String? _formatTemperature(
-    double? celsius,
-    UnitSystem unitSystem,
-    UnitConverter unitConverter,
-  ) {
-    if (celsius == null) return null;
-    if (unitSystem == UnitSystem.imperial) {
-      return '${unitConverter.cToF(celsius).toStringAsFixed(0)}\u00b0 F';
-    }
-    return '${celsius.toStringAsFixed(0)}\u00b0 C';
-  }
-
-  String? _formatGrinder(String? grinder, String? grindSetting) {
-    final g = grinder?.trim();
-    final s = grindSetting?.trim();
-    final hasG = g != null && g.isNotEmpty;
-    final hasS = s != null && s.isNotEmpty;
-    if (!hasG && !hasS) return null;
-    if (hasG && hasS) return '$s ($g)';
-    return hasS ? s : g;
-  }
-
-  String? _formatLocation(String? region, String? country) {
-    final r = region?.trim();
-    final c = country?.trim();
-    final hasR = r != null && r.isNotEmpty;
-    final hasC = c != null && c.isNotEmpty;
-    if (!hasR && !hasC) return null;
-    if (hasR && hasC) return '$r, $c';
-    return hasR ? r : c;
-  }
-
-  bool _isBlank(String? value) => value == null || value.trim().isEmpty;
 
   Future<String?> _promptTemplateName(BuildContext context, String initialName) async {
     var draftName = initialName;

@@ -59,6 +59,11 @@ Important logic:
 - Backup includes brew methods
 - `TemplateRepository` now supports `getById(...)` for template editing and entry prefill
 - Backup import tolerates old numeric altitude values and normalizes them to text
+- `CoffeeRecord` includes a derived nullable `lastEntryAt` sourced from the latest `entries.brewAt`
+- Coffee list `updatedAt` sort option is presented as **Recent activity** and orders by:
+  - latest `lastEntryAt` when a coffee has entries
+  - otherwise `coffee.updatedAt`
+  - then coffee name as a stable tie-breaker
 
 ## Navigation / Screens
 Routes in `lib/app/router.dart`.
@@ -134,7 +139,7 @@ Backup/import UI is in dedicated `BackupScreen`.
 
 ### Entry list
 - Filters/sort panel toggled from app bar.
-- Top header includes coffee metadata card (roaster + metadata/tags/notes).
+- Top header includes a shared coffee summary card widget.
 - Header shows entry count + sort chip + active method filter chip.
 - Entry card formatting:
   - Brew method shown as chip
@@ -149,19 +154,30 @@ Backup/import UI is in dedicated `BackupScreen`.
 
 ### Entry detail
 - Same menu actions as entry list.
+- Top of page uses the same shared coffee summary card as entry list.
+- Detail content is now sectioned into:
+  - heading row with brew date/time and brew method chip
+  - extraction outcome and starred chips
+  - recipe details grid
+  - recipe steps timeline
+  - results grid
+  - sensory grid
 - Star indicator in app bar when starred.
 - Timeline-style recipe list with final `End` tile.
 - `Start`/`Dur` removed from step subtitle.
 - Hides empty fields.
 - Suppresses extraction outcome when `unknown`.
 - Template-name prompt uses controller-free dialog input to avoid disposed-controller crashes
+- Espresso-specific values (`yield`, `pressure`, `preinfusion`) appear in the recipe details grid when present
 
 ## Formatting Rules (Current)
 Applied in entry list/detail:
-- Temperature: `<number>° C` or `<number>° F`
+- Shared display formatting now lives in `lib/core/utils/display_formatters.dart`
+- Temperature: `<number> °C` or `<number> °F`
 - Time: `mm:ss`
 - Weight: `<number> g`
 - Grinder: `GrindSize (Grinder)` when both exist
+- Pressure and extraction-outcome labels are also formatted from the shared display formatter
 
 ## Home Screen Aesthetic State
 Home screen currently includes:
@@ -173,11 +189,17 @@ Home screen currently includes:
   - distinct brew method count
 - Metrics tile layout: label above number
 - Section header: `All Coffees (N)` + sort chip
+- Sort label `Recent activity` maps to derived coffee activity, not just coffee-record edits
 - Active context chips (search only)
 - Coffee card metadata chip now combines location as `Region, Country`
 - Coffee card metadata chips: `Region, Country`, `Varietal`, `Process`
 - Altitude is shown as plain text metadata (not a chip)
 - Tasting notes appear above tag text and use a slightly larger text style (`bodyMedium`)
+- Coffee cards show `Last entry <date>` only when the coffee has at least one entry
+- Shared coffee summary card matches the home card typography for name/roaster and shows the full coffee metadata set:
+  - chips: `Region, Country`, `Varietal`, `Process`
+  - supporting lines: farm, producer, altitude, roast date, tags
+  - tasting notes as body text
 
 ## Known UX Rationale
 - No avatar circles on coffee tiles (avoids decorative clutter).
@@ -207,6 +229,7 @@ lib/
       search_indexer.dart
     utils/
       brew_time_calculator.dart
+      display_formatters.dart
       recipe_scaler.dart
       unit_converter.dart
   features/
@@ -215,6 +238,8 @@ lib/
     coffees/
       coffee_form_screen.dart
       coffee_list_screen.dart
+      widgets/
+        coffee_summary_card.dart
     entries/
       entry_detail_screen.dart
       entry_form_screen.dart
@@ -229,6 +254,8 @@ lib/
 
 test/
   brew_time_calculator_test.dart
+  coffee_list_screen_test.dart
+  coffee_repository_test.dart
   recipe_scaler_test.dart
   unit_converter_test.dart
   widget_test.dart

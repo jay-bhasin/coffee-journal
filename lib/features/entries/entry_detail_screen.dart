@@ -1,12 +1,12 @@
 import 'dart:convert';
 
-import 'package:coffee_journal/core/db/database.dart';
 import 'package:coffee_journal/core/db/database_provider.dart';
 import 'package:coffee_journal/core/models/enums.dart';
-import 'package:coffee_journal/core/models/recipe_step_draft.dart';
 import 'package:coffee_journal/core/models/sensory_notes.dart';
 import 'package:coffee_journal/core/repositories/contracts.dart';
-import 'package:coffee_journal/core/utils/unit_converter.dart';
+import 'package:coffee_journal/core/utils/display_formatters.dart';
+import 'package:coffee_journal/features/coffees/widgets/coffee_summary_card.dart';
+import 'package:coffee_journal/features/entries/entry_actions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -27,6 +27,7 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final repository = ref.watch(entryRepositoryProvider);
+    final coffeeRepository = ref.watch(coffeeRepositoryProvider);
     final templateRepository = ref.watch(templateRepositoryProvider);
     final unitSystem = ref.watch(unitSystemProvider).maybeWhen(
           data: (value) => value,
@@ -52,247 +53,383 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
           );
         }
         final entry = item.entry;
+        final coffeeFuture = coffeeRepository.getById(entry.coffeeId);
         final sensory = entry.sensoryJson == null
             ? null
             : SensoryNotes.fromJson(jsonDecode(entry.sensoryJson!) as Map<String, dynamic>);
+        final brewTime = entry.brewTimeSecManual ?? entry.brewTimeSecAuto;
+        final ratio = entry.coffeeDoseG <= 0 ? 0.0 : entry.waterTotalG / entry.coffeeDoseG;
+        final temperature = DisplayFormatters.formatTemperature(
+          entry.waterTempC,
+          unitSystem,
+          unitConverter,
+        );
+        final grinder = DisplayFormatters.formatGrinder(
+          entry.grinder,
+          entry.grindSetting,
+        );
 
         return Scaffold(
           appBar: AppBar(
-            title: Text(DateFormat.yMMMMd().add_Hm().format(entry.brewAt)),
+            // title: const Text('Entry'),
             actions: [
-              if (entry.isStarred)
-                const Padding(
-                  padding: EdgeInsets.only(right: 8),
-                  child: Icon(Icons.star, color: Colors.amber),
+              SizedBox.square(
+                dimension: 48,
+                child: IconButton(
+                  tooltip: entry.isStarred ? 'Unstar entry' : 'Star entry',
+                  onPressed: () async {
+                    await EntryActions.toggleStar(repository, item);
+                    setState(() => _refreshToken++);
+                  },
+                  padding: EdgeInsets.zero,
+                  icon: Icon(
+                    size: 24,
+                    entry.isStarred ? Icons.star : Icons.star_border,
+                    color: entry.isStarred ? Colors.amber : null,
+                  ),
                 ),
-              PopupMenuButton<String>(
-                onSelected: (value) async {
-                  switch (value) {
-                    case 'toggle_star':
-                      await repository.upsert(
-                        id: entry.id,
-                        coffeeId: entry.coffeeId,
-                        brewAt: entry.brewAt,
-                        brewMethod: entry.brewMethod,
-                        isStarred: !entry.isStarred,
-                        coffeeDoseG: entry.coffeeDoseG,
-                        waterTotalG: entry.waterTotalG,
-                        waterTempC: entry.waterTempC,
-                        grinder: entry.grinder,
-                        grindSetting: entry.grindSetting,
-                        yieldG: entry.yieldG,
-                        pressureBar: entry.pressureBar,
-                        preinfusionSec: entry.preinfusionSec,
-                        brewTimeSecAuto: entry.brewTimeSecAuto,
-                        brewTimeSecManual: entry.brewTimeSecManual,
-                        sensoryJson: entry.sensoryJson,
-                        dialInNotes: entry.dialInNotes,
-                        miscNotes: entry.miscNotes,
-                        agitationLevel: entry.agitationLevel,
-                        drawdownSec: entry.drawdownSec,
-                        extractionOutcome: ExtractionOutcome.values.firstWhere(
-                          (e) => e.name == entry.extractionOutcome,
-                          orElse: () => ExtractionOutcome.unknown,
-                        ),
-                        steps: _stepsToDrafts(item.steps),
-                        tags: item.tags,
-                      );
-                      setState(() => _refreshToken++);
-                      break;
-                    case 'duplicate':
-                      await repository.duplicateEntryToNewDay(entry.id, DateTime.now());
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Duplicated as today')),
-                        );
-                      }
-                      break;
-                    case 'edit':
-                      if (!context.mounted) return;
-                      await context.push('/coffee/${entry.coffeeId}/entry/${entry.id}/edit');
-                      if (mounted) setState(() => _refreshToken++);
-                      break;
-                    case 'create_template':
-                      try {
-                        final defaultName = '${entry.brewMethod} ${DateFormat.yMMMd().format(entry.brewAt)}';
-                        final name = await _promptTemplateName(context, defaultName);
-                        if (name == null || name.trim().isEmpty) break;
-                        final tags = item.tags
-                            .map((e) => e.trim())
-                            .where((e) => e.isNotEmpty)
-                            .toSet()
-                            .toList(growable: false);
-                        await templateRepository.upsert(
-                          name: name.trim(),
-                          scope: TemplateScope.global,
-                          coffeeId: null,
-                          brewMethod: entry.brewMethod,
-                          defaultCoffeeDoseG: entry.coffeeDoseG,
-                          defaultWaterTotalG: entry.waterTotalG,
-                          steps: _stepsToDrafts(item.steps),
-                          tags: tags,
-                        );
+              ),
+              SizedBox.square(
+                dimension: 48,
+                child: IconButton(
+                  tooltip: 'Edit',
+                  onPressed: () async {
+                    if (!context.mounted) return;
+                    await context.push('/coffee/${entry.coffeeId}/entry/${entry.id}/edit');
+                    if (mounted) setState(() => _refreshToken++);
+                  },
+                  padding: EdgeInsets.zero,
+                  icon: const Icon(Icons.edit_outlined, size:24),
+                ),
+              ),
+              SizedBox.square(
+                dimension: 48,
+                child: PopupMenuButton<String>(
+                  padding: EdgeInsets.zero,
+                  icon: const Icon(Icons.more_vert, size:24),
+                  onSelected: (value) async {
+                    switch (value) {
+                      case 'toggle_star':
+                        await EntryActions.toggleStar(repository, item);
+                        setState(() => _refreshToken++);
+                        break;
+                      case 'duplicate':
+                        await EntryActions.duplicateAsToday(repository, entry.id);
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Template created')),
+                            const SnackBar(content: Text('Entry duplicated')),
                           );
                         }
-                      } catch (error, stackTrace) {
-                        debugPrint('Create template failed: $error');
-                        debugPrintStack(stackTrace: stackTrace);
+                        break;
+                      case 'edit':
+                        if (!context.mounted) return;
+                        await context.push('/coffee/${entry.coffeeId}/entry/${entry.id}/edit');
+                        if (mounted) setState(() => _refreshToken++);
+                        break;
+                      case 'create_template':
+                        try {
+                          final defaultName = '${entry.brewMethod} ${DateFormat.yMMMd().format(entry.brewAt)}';
+                          final name = await _promptTemplateName(context, defaultName);
+                          if (name == null || name.trim().isEmpty) break;
+                          final tags = item.tags
+                              .map((e) => e.trim())
+                              .where((e) => e.isNotEmpty)
+                              .toSet()
+                              .toList(growable: false);
+                          await templateRepository.upsert(
+                            name: name.trim(),
+                            scope: TemplateScope.global,
+                            coffeeId: null,
+                            brewMethod: entry.brewMethod,
+                            defaultCoffeeDoseG: entry.coffeeDoseG,
+                            defaultWaterTotalG: entry.waterTotalG,
+                            steps: EntryActions.stepDraftsFromSteps(item.steps),
+                            tags: tags,
+                          );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Template created')),
+                            );
+                          }
+                        } catch (error, stackTrace) {
+                          debugPrint('Create template failed: $error');
+                          debugPrintStack(stackTrace: stackTrace);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Template creation failed: $error')),
+                            );
+                          }
+                        }
+                        break;
+                      case 'delete':
+                        await repository.delete(entry.id);
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Template creation failed: $error')),
-                          );
+                          context.pop();
                         }
-                      }
-                      break;
-                    case 'delete':
-                      await repository.delete(entry.id);
-                      if (context.mounted) {
-                        context.pop();
-                      }
-                      break;
-                  }
-                },
-                itemBuilder: (context) => [
-                  PopupMenuItem(
-                    value: 'toggle_star',
-                    child: Text(entry.isStarred ? 'Unstar' : 'Star'),
-                  ),
-                  const PopupMenuItem(value: 'duplicate', child: Text('Duplicate as today')),
-                  const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                  const PopupMenuItem(
-                    value: 'create_template',
-                    child: Text('Create template from entry'),
-                  ),
-                  const PopupMenuItem(value: 'delete', child: Text('Delete')),
-                ],
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'toggle_star',
+                      child: Text(entry.isStarred ? 'Unstar' : 'Star'),
+                    ),
+                    const PopupMenuItem(value: 'duplicate', child: Text('Duplicate')),
+                    const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                    const PopupMenuItem(
+                      value: 'create_template',
+                      child: Text('Create template from entry'),
+                    ),
+                    const PopupMenuItem(value: 'delete', child: Text('Delete')),
+                  ],
+                ),
               ),
             ],
           ),
-          body: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              // Text(
-              //   DateFormat.yMMMMd().add_Hm().format(entry.brewAt),
-              //   style: Theme.of(context).textTheme.titleLarge,
-              // ),
-              Text('Recipe details', style: Theme.of(context).textTheme.titleMedium),
-
-              const SizedBox(height: 8),
-              Text('Method: ${entry.brewMethod}'),
-              Text('Dose: ${_formatWeight(entry.coffeeDoseG)}'),
-              Text('Water: ${_formatWeight(entry.waterTotalG)}'),
-              if (_formatTemperature(entry.waterTempC, unitSystem, unitConverter) != null)
-                Text('Temperature: ${_formatTemperature(entry.waterTempC, unitSystem, unitConverter)!}'),
-              if (_formatGrinder(entry.grinder, entry.grindSetting) != null)
-                Text('Grinder: ${_formatGrinder(entry.grinder, entry.grindSetting)!}'),
-              Text('Brew time: ${_formatDuration(entry.brewTimeSecManual ?? entry.brewTimeSecAuto)}'),
-              if (entry.extractionOutcome != ExtractionOutcome.unknown.name)
-                Text('Extraction outcome: ${entry.extractionOutcome}'),
-              if (entry.drawdownSec != null) Text('Drawdown: ${_formatDuration(entry.drawdownSec!)}'),
-              if (!_isBlank(entry.agitationLevel)) Text('Agitation: ${entry.agitationLevel}'),
-              if (!_isBlank(entry.dialInNotes)) Text('Dial-in notes: ${entry.dialInNotes}'),
-              if (!_isBlank(entry.miscNotes)) Text('Misc notes: ${entry.miscNotes}'),
-              if (item.tags.isNotEmpty) Text('Tags: ${item.tags.join(', ')}'),
-              const Divider(height: 24),
-              Text('Steps', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 8),
-              ...item.steps.asMap().entries.map(
-                (entryWithIndex) => Card(
-                  child: IntrinsicHeight(
-                    child: Row(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: _StepTimelineMarker(
-                            isFirst: entryWithIndex.key == 0,
-                            isLast: entryWithIndex.key == item.steps.length - 1,
-                            startLabel: _formatDuration(entryWithIndex.value.startSec),
-                          ),
-                        ),
-                        Expanded(
-                          child: ListTile(
-                            title: Text('${entryWithIndex.value.stepIndex + 1}. ${entryWithIndex.value.type}'),
-                            subtitle: Text(
-                              [
-                                if (entryWithIndex.value.waterG != null)
-                                  _formatWeight(entryWithIndex.value.waterG!),
-                                if (entryWithIndex.value.pressureBar != null)
-                                  '${entryWithIndex.value.pressureBar!.toStringAsFixed(1)} bar',
-                                if (!_isBlank(entryWithIndex.value.note)) entryWithIndex.value.note,
-                                if (!_isBlank(entryWithIndex.value.label)) entryWithIndex.value.label,
-                              ].join(' • '),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              Card(
-                child: IntrinsicHeight(
-                  child: Row(
+          body: FutureBuilder<CoffeeRecord?>(
+            future: coffeeFuture,
+            builder: (context, coffeeSnapshot) {
+              final bottomInset = MediaQuery.of(context).viewPadding.bottom;
+              return ListView(
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomInset),
+                children: [
+                  Row(
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: _StepTimelineMarker(
-                          isFirst: false,
-                          isLast: true,
-                          startLabel: _formatDuration(entry.brewTimeSecManual ?? entry.brewTimeSecAuto),
-                        ),
-                      ),
-                      const Expanded(
-                        child: ListTile(
-                          title: Text('End'),
+                      Expanded(
+                        child: Text(
+                          DateFormat.yMMMMd().add_Hm().format(entry.brewAt),
+                          style: Theme.of(context).textTheme.titleLarge,
                         ),
                       ),
                     ],
                   ),
-                ),
-              ),
-              if (sensory != null) ...[
-                const Divider(height: 24),
-                Text('Sensory', style: Theme.of(context).textTheme.titleMedium),
-                if (!_isBlank(sensory.aroma)) Text('Aroma: ${sensory.aroma}'),
-                if (!_isBlank(sensory.flavor)) Text('Flavor: ${sensory.flavor}'),
-                if (!_isBlank(sensory.acidity)) Text('Acidity: ${sensory.acidity}'),
-                if (!_isBlank(sensory.sweetness)) Text('Sweetness: ${sensory.sweetness}'),
-                if (!_isBlank(sensory.body)) Text('Body: ${sensory.body}'),
-                if (!_isBlank(sensory.aftertaste)) Text('Aftertaste: ${sensory.aftertaste}'),
-                if (!_isBlank(sensory.freeText)) Text('Notes: ${sensory.freeText}'),
-              ],
-            ],
+                  if (coffeeSnapshot.data != null) ... [
+                    const SizedBox(height: 12),
+                    CoffeeSummaryCard(
+                      record: coffeeSnapshot.data!,
+                      margin: EdgeInsets.zero,
+                      showDetails: false,
+                    ),
+                  ],
+                  //const Divider(height: 32),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      if (entry.extractionOutcome != ExtractionOutcome.unknown.name)
+                        Chip(
+                          avatar: Icon(DisplayFormatters.extractionOutcomeIcon(entry.extractionOutcome), size: 18),
+                          label: Text(
+                            DisplayFormatters.formatExtractionOutcome(
+                              entry.extractionOutcome,
+                            ),
+                          ),
+                        ),
+                      if (entry.isStarred)
+                        const Chip(
+                          avatar: Icon(Icons.star, color: Colors.amber, size: 18),
+                          label: Text('Starred'),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _SectionTitle(title: 'Recipe details'),
+                  const SizedBox(height: 8),
+                  _InfoGrid(
+                    children: [
+                        _InfoCard(
+                          label: 'Brew method',
+                          value: entry.brewMethod,
+                          icon: const Icon(Icons.coffee_maker_outlined)
+                        ),
+                      _InfoCard(
+                        label: 'Coffee dose',
+                        value: DisplayFormatters.formatWeight(entry.coffeeDoseG),
+                        icon: const Icon(Icons.scale_outlined),
+                      ),
+                      _InfoCard(
+                        label: 'Water amount',
+                        value: DisplayFormatters.formatWeight(entry.waterTotalG),
+                        icon: const Icon(Icons.water_drop_outlined),
+                      ),
+                      _InfoCard(
+                        label: 'Ratio',
+                        value: '1:${ratio.toStringAsFixed(1)}',
+                        icon: const Icon(Icons.balance_outlined),
+                      ),
+                      if (temperature != null)
+                        _InfoCard(
+                          label: 'Water temperature',
+                          value: temperature,
+                          icon: const Icon(Icons.thermostat_outlined),
+                        ),
+                      if (grinder != null)
+                        _InfoCard(
+                          label: 'Grind',
+                          value: grinder,
+                          icon: const Icon(Icons.tune),
+                        ),
+                      if (entry.yieldG != null)
+                        _InfoCard(
+                          label: 'Yield',
+                          value: DisplayFormatters.formatWeight(entry.yieldG!),
+                          icon: const Icon(Icons.local_drink_outlined),
+                        ),
+                      if (entry.pressureBar != null)
+                        _InfoCard(
+                          label: 'Pressure',
+                          value: DisplayFormatters.formatPressure(entry.pressureBar!),
+                          icon: const Icon(Icons.speed_outlined),
+                        ),
+                      if (entry.preinfusionSec != null)
+                        _InfoCard(
+                          label: 'Preinfusion',
+                          value: DisplayFormatters.formatDuration(entry.preinfusionSec),
+                          icon: const Icon(Icons.timelapse_outlined),
+                        ),
+                      _InfoCard(
+                        label: 'Brew time',
+                        value: DisplayFormatters.formatDuration(brewTime),
+                        icon: const Icon(Icons.timer_outlined),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 32),
+                  _SectionTitle(title: 'Recipe steps'),
+                  const SizedBox(height: 8),
+                  () {
+                    var cumulativeWater = 0.0;
+                    return Column(
+                      children: item.steps.asMap().entries.map((entryWithIndex) {
+                        final stepWater = entryWithIndex.value.waterG;
+                        if ((stepWater ?? 0) > 0) {
+                          cumulativeWater += stepWater!;
+                        }
+                        var hasNotes = entryWithIndex.value.pressureBar != null || !_isBlank(entryWithIndex.value.note) || !_isBlank(entryWithIndex.value.label);
+
+                        return _TimelineStepRow(
+                          marker: _StepTimelineMarker(
+                            isFirst: entryWithIndex.key == 0,
+                            isLast: false,
+                            startLabel: DisplayFormatters.formatDuration(
+                              entryWithIndex.value.startSec,
+                            ),
+                            waterLabel: (stepWater ?? 0) > 0 ? DisplayFormatters.formatWeight(cumulativeWater) : '',
+                          ),
+                          child: ListTile(
+                            leading: Text(
+                              "${entryWithIndex.value.stepIndex + 1}",
+                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if ((stepWater ?? 0) > 0) ... [
+                                    Icon(Icons.water_drop_outlined, size: 18),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      DisplayFormatters.formatWeight(cumulativeWater),
+                                      style: Theme.of(context).textTheme.bodyMedium,
+                                    ),
+                                ]
+                              ],
+                            ),
+                            title: Text(
+                              entryWithIndex.value.type, // '${entryWithIndex.value.stepIndex + 1}. ${entryWithIndex.value.type}',
+                            ),
+                            subtitle: hasNotes ? Text(
+                              [
+                                if (entryWithIndex.value.pressureBar != null)
+                                  DisplayFormatters.formatPressure(
+                                    entryWithIndex.value.pressureBar!,
+                                  ),
+                                if (!_isBlank(entryWithIndex.value.note)) entryWithIndex.value.note,
+                                if (!_isBlank(entryWithIndex.value.label)) entryWithIndex.value.label,
+                              ].join(' • '),
+                            ) : null,
+                          ),
+                        );
+                      }).toList(growable: false),
+                    );
+                  }(),
+                  _TimelineStepRow(
+                    marker: _StepTimelineMarker(
+                      isFirst: false,
+                      isLast: true,
+                      startLabel: DisplayFormatters.formatDuration(brewTime),
+                      waterLabel: '',
+                    ),
+                    child: const ListTile(
+                      title: Text('End'),
+                    ),
+                  ),
+                  const Divider(height: 32),
+                  _SectionTitle(title: 'Results'),
+                  const SizedBox(height: 8),
+                  _InfoGrid(
+                    children: [
+                      if (entry.drawdownSec != null)
+                        _InfoCard(
+                          label: 'Drawdown time',
+                          value: DisplayFormatters.formatDuration(entry.drawdownSec),
+                          icon: const Icon(Icons.hourglass_empty_outlined),
+                        ),
+                      if (!_isBlank(entry.agitationLevel))
+                        _InfoCard(
+                          label: 'Agitation level',
+                          value: entry.agitationLevel!,
+                          icon: const Icon(Icons.tune_outlined),
+                        ),
+                      if (!_isBlank(entry.dialInNotes))
+                        _InfoCard(
+                          label: 'Dial-in notes',
+                          value: entry.dialInNotes!,
+                          icon: const Icon(Icons.description_outlined),
+                          fullWidth: true,
+                        ),
+                      if (!_isBlank(entry.miscNotes))
+                        _InfoCard(
+                          label: 'Misc notes',
+                          value: entry.miscNotes!,
+                          icon: const Icon(Icons.description_outlined),
+                          fullWidth: true,
+                        ),
+                    ],
+                  ),
+                  if (sensory != null) ...[
+                    const Divider(height: 32),
+                    _SectionTitle(title: 'Sensory'),
+                    const SizedBox(height: 8),
+                    _InfoGrid(
+                      children: [
+                        if (!_isBlank(sensory.aroma))
+                          _InfoCard(label: 'Aroma', value: sensory.aroma!, fullWidth: true),
+                        if (!_isBlank(sensory.flavor))
+                          _InfoCard(label: 'Flavor', value: sensory.flavor!, fullWidth: true),
+                        if (!_isBlank(sensory.acidity))
+                          _InfoCard(label: 'Acidity', value: sensory.acidity!, fullWidth: true),
+                        if (!_isBlank(sensory.sweetness))
+                          _InfoCard(label: 'Sweetness', value: sensory.sweetness!, fullWidth: true),
+                        if (!_isBlank(sensory.body))
+                          _InfoCard(label: 'Body', value: sensory.body!, fullWidth: true),
+                        if (!_isBlank(sensory.aftertaste))
+                          _InfoCard(label: 'Aftertaste', value: sensory.aftertaste!, fullWidth: true),
+                        if (!_isBlank(sensory.freeText))
+                          _InfoCard(label: 'Notes', value: sensory.freeText!, fullWidth: true),
+                      ],
+                    ),
+                  ],
+                ],
+              );
+            },
           ),
         );
       },
     );
-  }
-
-  List<RecipeStepDraft> _stepsToDrafts(List<EntryStep> steps) {
-    return steps
-        .map(
-          (s) => RecipeStepDraft(
-            type: RecipeStepType.values.firstWhere(
-              (e) => e.name == s.type,
-              orElse: () => RecipeStepType.custom,
-            ),
-            index: s.stepIndex,
-            startSec: s.startSec,
-            durationSec: s.durationSec,
-            note: s.note,
-            waterG: s.waterG,
-            flowRateGPerSec: s.flowRateGPerSec,
-            pressureBar: s.pressureBar,
-            count: s.count,
-            tool: s.tool,
-            label: s.label,
-            jsonPayload: s.jsonPayload,
-          ),
-        )
-        .toList(growable: false);
   }
 
   Future<String?> _promptTemplateName(BuildContext context, String initialName) async {
@@ -325,36 +462,148 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
   }
 
   bool _isBlank(String? value) => value == null || value.trim().isEmpty;
+}
 
-  String _formatDuration(int? seconds) {
-    if (seconds == null) return '-';
-    final minutes = seconds ~/ 60;
-    final secs = seconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title,
+      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+    );
   }
+}
 
-  String _formatWeight(double grams) => '${grams.toStringAsFixed(1)} g';
+class _InfoGrid extends StatelessWidget {
+  const _InfoGrid({required this.children});
 
-  String? _formatTemperature(
-    double? celsius,
-    UnitSystem unitSystem,
-    UnitConverter unitConverter,
-  ) {
-    if (celsius == null) return null;
-    if (unitSystem == UnitSystem.imperial) {
-      return '${unitConverter.cToF(celsius).toStringAsFixed(0)}\u00b0 F';
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    if (children.isEmpty) {
+      return const SizedBox.shrink();
     }
-    return '${celsius.toStringAsFixed(0)}\u00b0 C';
-  }
 
-  String? _formatGrinder(String? grinder, String? grindSetting) {
-    final g = grinder?.trim();
-    final s = grindSetting?.trim();
-    final hasG = g != null && g.isNotEmpty;
-    final hasS = s != null && s.isNotEmpty;
-    if (!hasG && !hasS) return null;
-    if (hasG && hasS) return '$g • $s';
-    return hasG ? g : s;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const spacing = 8.0;
+        final halfWidth = (constraints.maxWidth - spacing) / 2;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: children.map((child) {
+            final fullWidth = child is _InfoCard && child.fullWidth;
+            return SizedBox(
+              width: fullWidth ? constraints.maxWidth : halfWidth,
+              child: child,
+            );
+          }).toList(growable: false),
+        );
+      },
+    );
+  }
+}
+
+class _InfoCard extends StatelessWidget {
+  const _InfoCard({
+    required this.label,
+    required this.value,
+    this.icon,
+    this.fullWidth = false,
+  });
+
+  final String label;
+  final String value;
+  final Icon? icon;
+  final bool fullWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card.outlined(
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        child: Row(
+          children: [
+            if (icon != null) ...[
+              IconTheme(
+                data: IconThemeData(
+                  size: 18,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                child: icon!,
+              ),
+              const SizedBox(width: 10),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    label,
+                    style: Theme.of(context).textTheme.labelSmall,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    style: fullWidth
+                        ? Theme.of(context).textTheme.bodyMedium
+                        : Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                    softWrap: true,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TimelineStepRow extends StatelessWidget {
+  const _TimelineStepRow({
+    required this.marker,
+    required this.child,
+  });
+
+  final Widget marker;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            marker,
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Card(
+                  margin: EdgeInsets.zero,
+                  child: child,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -363,63 +612,66 @@ class _StepTimelineMarker extends StatelessWidget {
     required this.isFirst,
     required this.isLast,
     required this.startLabel,
+    required this.waterLabel,
   });
 
   final bool isFirst;
   final bool isLast;
   final String startLabel;
+  final String waterLabel;
 
   @override
   Widget build(BuildContext context) {
-    final lineColor = Theme.of(context).colorScheme.outlineVariant;
-    final dotColor = Theme.of(context).colorScheme.primary;
-
     return SizedBox(
-      width: 68,
+      width: 48, // 140
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
-            width: 16,
-            child: Center(
-              child: Column(
+            width: 44,
+            child: Align(
+              alignment: Alignment.center,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: Container(
-                      width: 2,
-                      color: isFirst ? Colors.transparent : lineColor,
-                    ),
-                  ),
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: dotColor,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  Expanded(
-                    child: Container(
-                      width: 2,
-                      color: isLast ? Colors.transparent : lineColor,
-                    ),
+                  // if (startLabel != '') Icon(Icons.timer_outlined, size: 18),
+                  Text(
+                    startLabel,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                    textAlign: TextAlign.left,
                   ),
                 ],
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 44,
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                startLabel,
-                style: Theme.of(context).textTheme.bodySmall,
-                textAlign: TextAlign.right,
-              ),
-            ),
-          ),
+          // SizedBox(
+          //   width: 16,
+          //   child: Center(
+          //     child: Column(
+          //       children: [
+          //         Expanded(
+          //           child: Container(
+          //             width: 2,
+          //             color: isFirst ? Colors.transparent : lineColor,
+          //           ),
+          //         ),
+          //         Container(
+          //           width: 12,
+          //           height: 2,
+          //           color: dotColor,
+          //         ),
+          //         Expanded(
+          //           child: Container(
+          //             width: 2,
+          //             color: isLast ? Colors.transparent : lineColor,
+          //           ),
+          //         ),
+          //       ],
+          //     ),
+          //   ),
+          // ),
         ],
       ),
     );
