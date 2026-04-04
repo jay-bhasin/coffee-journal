@@ -16,6 +16,7 @@ class CoffeeListScreen extends ConsumerStatefulWidget {
 
 class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   CoffeeSortOption _sort = CoffeeSortOption.updatedAt;
   bool _showSearch = false;
   late Future<_HomeData> _homeDataFuture;
@@ -29,6 +30,7 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -62,66 +64,40 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
 
           return CustomScrollView(
             slivers: [
-              SliverAppBar.large(
+              SliverAppBar(
                 pinned: true,
-                title: const Text('Coffee Journal'),
-                actions: [
-                  IconButton(
-                    tooltip: _showSearch ? 'Hide search' : 'Search',
-                    onPressed: () {
-                      setState(() {
-                        _showSearch = !_showSearch;
-                        if (!_showSearch && _searchController.text.isNotEmpty) {
+                titleSpacing: _showSearch ? 8 : NavigationToolbar.kMiddleSpacing,
+                title: _showSearch
+                    ? _AppBarSearchField(
+                        controller: _searchController,
+                        focusNode: _searchFocusNode,
+                        onChanged: (_) => _refreshHomeData(),
+                        onClear: () {
                           _searchController.clear();
-                          _homeDataFuture = _buildHomeDataFuture();
-                        }
-                      });
-                    },
-                    icon: Icon(_showSearch ? Icons.close : Icons.search),
-                  ),
-                  IconButton(
-                    tooltip: 'Settings',
-                    onPressed: () => context.push('/settings'),
-                    icon: const Icon(Icons.settings),
-                  ),
+                          _refreshHomeData();
+                        },
+                      )
+                    : const Text('Coffee Journal'),
+                actions: [
+                  if (_showSearch)
+                    IconButton(
+                      tooltip: 'Close search',
+                      onPressed: _closeSearch,
+                      icon: const Icon(Icons.close),
+                    )
+                  else ...[
+                    IconButton(
+                      tooltip: 'Search',
+                      onPressed: _openSearch,
+                      icon: const Icon(Icons.search),
+                    ),
+                    IconButton(
+                      tooltip: 'Settings',
+                      onPressed: () => context.push('/settings'),
+                      icon: const Icon(Icons.settings),
+                    ),
+                  ],
                 ],
-              ),
-              SliverToBoxAdapter(
-                child: AnimatedSize(
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeOut,
-                  child: _showSearch
-                      ? Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                          child: Material(
-                            elevation: 1,
-                            borderRadius: BorderRadius.circular(16),
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.surfaceContainerHigh,
-                            child: TextField(
-                              controller: _searchController,
-                              decoration: InputDecoration(
-                                border: InputBorder.none,
-                                prefixIcon: const Icon(Icons.search),
-                                hintText: 'Search name, roaster, origin, tags',
-                                suffixIcon: IconButton(
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    _refreshHomeData();
-                                  },
-                                  icon: const Icon(Icons.clear),
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  vertical: 14,
-                                ),
-                              ),
-                              onChanged: (_) => _refreshHomeData(),
-                            ),
-                          ),
-                        )
-                      : const SizedBox.shrink(),
-                ),
               ),
               SliverToBoxAdapter(
                 child: Padding(
@@ -271,6 +247,26 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
     });
   }
 
+  void _openSearch() {
+    setState(() => _showSearch = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _searchFocusNode.requestFocus();
+      }
+    });
+  }
+
+  void _closeSearch() {
+    _searchFocusNode.unfocus();
+    setState(() {
+      _showSearch = false;
+      if (_searchController.text.isNotEmpty) {
+        _searchController.clear();
+        _homeDataFuture = _buildHomeDataFuture();
+      }
+    });
+  }
+
   Future<_HomeData> _buildHomeDataFuture() {
     final repository = ref.read(coffeeRepositoryProvider);
     final db = ref.read(appDatabaseProvider);
@@ -366,6 +362,51 @@ class _MetricTile extends StatelessWidget {
             ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AppBarSearchField extends StatelessWidget {
+  const _AppBarSearchField({
+    required this.controller,
+    required this.focusNode,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: TextField(
+        controller: controller,
+        focusNode: focusNode,
+        autofocus: true,
+        textInputAction: TextInputAction.search,
+        decoration: InputDecoration(
+          hintText: 'Search name, roaster, origin, tags',
+          isDense: true,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+          suffixIcon: controller.text.trim().isNotEmpty
+              ? IconButton(
+                  tooltip: 'Clear search',
+                  onPressed: onClear,
+                  icon: const Icon(Icons.close, size: 18),
+                )
+              : null,
+        ),
+        onChanged: onChanged,
       ),
     );
   }
