@@ -328,11 +328,6 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                                   final name = await _promptTemplateName(context, defaultName);
                                   if (name == null || name.trim().isEmpty) break;
                                   final steps = EntryActions.stepDraftsFromSteps(record.steps);
-                                  final tags = record.tags
-                                      .map((e) => e.trim())
-                                      .where((e) => e.isNotEmpty)
-                                      .toSet()
-                                      .toList(growable: false);
 
                                   await templateRepository.upsert(
                                     name: name.trim(),
@@ -342,7 +337,7 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                                     defaultCoffeeDoseG: entry.coffeeDoseG,
                                     defaultWaterTotalG: entry.waterTotalG,
                                     steps: steps,
-                                    tags: tags,
+                                    tags: const [],
                                   );
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(

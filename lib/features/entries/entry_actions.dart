@@ -38,7 +38,6 @@ class EntryActions {
         orElse: () => ExtractionOutcome.unknown,
       ),
       steps: stepDraftsFromSteps(record.steps),
-      tags: record.tags,
     );
   }
 

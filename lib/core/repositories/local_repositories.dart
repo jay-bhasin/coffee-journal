@@ -289,7 +289,6 @@ class LocalEntryRepository implements EntryRepository {
           ),
         ),
       ),
-      tags: existing.tags,
     );
   }
 
@@ -305,8 +304,7 @@ class LocalEntryRepository implements EntryRepository {
               ..where((tbl) => tbl.entryId.equals(id))
               ..orderBy([(tbl) => OrderingTerm.asc(tbl.stepIndex)]))
             .get();
-    final tags = await _tagsForEntry(id);
-    return EntryRecord(entry: entry, steps: steps, tags: tags);
+    return EntryRecord(entry: entry, steps: steps);
   }
 
   @override
@@ -329,24 +327,6 @@ class LocalEntryRepository implements EntryRepository {
     }
     if (filter.end != null) {
       q.where((tbl) => tbl.brewAt.isSmallerOrEqualValue(filter.end!));
-    }
-
-    if (filter.tag != null && filter.tag!.trim().isNotEmpty) {
-      final normalized = _searchIndexer.normalize(filter.tag!);
-      final tag =
-          await (_db.select(_db.tags)
-                ..where((tbl) => tbl.normalizedName.equals(normalized)))
-              .getSingleOrNull();
-      if (tag == null) {
-        return [];
-      }
-      final links = await (_db.select(
-        _db.entryTags,
-      )..where((tbl) => tbl.tagId.equals(tag.id))).get();
-      if (links.isEmpty) {
-        return [];
-      }
-      q.where((tbl) => tbl.id.isIn(links.map((e) => e.entryId).toList()));
     }
 
     switch (sort) {
@@ -374,8 +354,7 @@ class LocalEntryRepository implements EntryRepository {
                   ..where((tbl) => tbl.entryId.equals(entry.id))
                   ..orderBy([(tbl) => OrderingTerm.asc(tbl.stepIndex)]))
                 .get();
-        final tags = await _tagsForEntry(entry.id);
-        return EntryRecord(entry: entry, steps: steps, tags: tags);
+        return EntryRecord(entry: entry, steps: steps);
       }),
     );
   }
@@ -404,7 +383,6 @@ class LocalEntryRepository implements EntryRepository {
     int? drawdownSec,
     required ExtractionOutcome extractionOutcome,
     required List<RecipeStepDraft> steps,
-    List<String> tags = const [],
   }) async {
     final normalizedSteps = RecipeTimeline.normalize(steps);
     final now = DateTime.now();
@@ -420,7 +398,6 @@ class LocalEntryRepository implements EntryRepository {
       dialInNotes,
       miscNotes,
       agitationLevel,
-      ...tags,
     ]);
 
     await _db
@@ -479,58 +456,8 @@ class LocalEntryRepository implements EntryRepository {
             ),
           );
     }
-
-    await _replaceEntryTags(entityId, tags);
   }
 
-  Future<void> _replaceEntryTags(String entryId, List<String> tags) async {
-    await (_db.delete(
-      _db.entryTags,
-    )..where((tbl) => tbl.entryId.equals(entryId))).go();
-    for (final tag in tags) {
-      final id = await _upsertTag(tag);
-      await _db
-          .into(_db.entryTags)
-          .insert(
-            EntryTagsCompanion(entryId: Value(entryId), tagId: Value(id)),
-            mode: InsertMode.insertOrIgnore,
-          );
-    }
-  }
-
-  Future<String> _upsertTag(String raw) async {
-    final name = raw.trim();
-    final normalized = _searchIndexer.normalize(name);
-    final existing = await (_db.select(
-      _db.tags,
-    )..where((tbl) => tbl.normalizedName.equals(normalized))).getSingleOrNull();
-    if (existing != null) {
-      await (_db.update(_db.tags)..where((tbl) => tbl.id.equals(existing.id)))
-          .write(TagsCompanion(usageCount: Value(existing.usageCount + 1)));
-      return existing.id;
-    }
-
-    final id = _uuid.v4();
-    await _db
-        .into(_db.tags)
-        .insert(
-          TagsCompanion(
-            id: Value(id),
-            name: Value(name),
-            normalizedName: Value(normalized),
-            usageCount: const Value(1),
-          ),
-        );
-    return id;
-  }
-
-  Future<List<String>> _tagsForEntry(String entryId) async {
-    final rows = await (_db.select(_db.tags).join([
-      innerJoin(_db.entryTags, _db.entryTags.tagId.equalsExp(_db.tags.id)),
-    ])..where(_db.entryTags.entryId.equals(entryId))).get();
-
-    return rows.map((row) => row.readTable(_db.tags).name).toList();
-  }
 }
 
 class LocalTemplateRepository implements TemplateRepository {

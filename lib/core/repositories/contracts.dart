@@ -18,12 +18,10 @@ class EntryRecord {
   const EntryRecord({
     required this.entry,
     required this.steps,
-    required this.tags,
   });
 
   final Entry entry;
   final List<EntryStep> steps;
-  final List<String> tags;
 }
 
 class TemplateRecord {
@@ -42,14 +40,12 @@ class EntryFilter {
   const EntryFilter({
     this.method,
     this.starredOnly = false,
-    this.tag,
     this.start,
     this.end,
   });
 
   final String? method;
   final bool starredOnly;
-  final String? tag;
   final DateTime? start;
   final DateTime? end;
 }
@@ -111,7 +107,6 @@ abstract class EntryRepository {
     int? drawdownSec,
     required ExtractionOutcome extractionOutcome,
     required List<RecipeStepDraft> steps,
-    List<String> tags,
   });
 
   Future<void> duplicateEntryToNewDay(String entryId, DateTime newDate);

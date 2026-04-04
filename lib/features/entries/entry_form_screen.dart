@@ -45,7 +45,6 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
   final _agitationController = TextEditingController();
   final _dialInController = TextEditingController();
   final _miscController = TextEditingController();
-  final _tagsController = TextEditingController();
 
   final _aromaController = TextEditingController();
   final _flavorController = TextEditingController();
@@ -97,7 +96,6 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
     _agitationController.dispose();
     _dialInController.dispose();
     _miscController.dispose();
-    _tagsController.dispose();
 
     _aromaController.dispose();
     _flavorController.dispose();
@@ -178,7 +176,6 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
               _agitationController.text = entry.agitationLevel ?? '';
               _dialInController.text = entry.dialInNotes ?? '';
               _miscController.text = entry.miscNotes ?? '';
-              _tagsController.text = item.tags.join(', ');
               _brewTimeManual = entry.brewTimeSecManual;
               _steps = RecipeTimeline.normalize(
                 item.steps.map<RecipeStepDraft>(
@@ -234,7 +231,6 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
               _agitationController.text = '';
               _dialInController.text = '';
               _miscController.text = '';
-              _tagsController.text = item.tags.join(', ');
               _brewTimeManual = null;
               _steps = RecipeTimeline.normalize(
                 item.steps.map<RecipeStepDraft>(
@@ -608,10 +604,6 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
         maxLines: 3,
         decoration: const InputDecoration(labelText: 'Misc notes'),
       ),
-      TextFormField(
-        controller: _tagsController,
-        decoration: const InputDecoration(labelText: 'Tags (comma-separated)'),
-      ),
       const Divider(height: 28),
       Text('Sensory notes', style: Theme.of(context).textTheme.titleMedium),
       TextFormField(
@@ -733,15 +725,6 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
     );
   }
 
-  List<String> _splitTags(String raw) {
-    return raw
-        .split(',')
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toSet()
-        .toList();
-  }
-
   String? _clean(String raw) {
     final trimmed = raw.trim();
     return trimmed.isEmpty ? null : trimmed;
@@ -797,7 +780,6 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
       drawdownSec: int.tryParse(_drawdownController.text),
       extractionOutcome: _extractionOutcome,
       steps: RecipeTimeline.normalize(_steps),
-      tags: _splitTags(_tagsController.text),
     );
     if (mounted) context.pop();
   }

@@ -132,11 +132,6 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
                           final defaultName = '${entry.brewMethod} ${DateFormat.yMMMd().format(entry.brewAt)}';
                           final name = await _promptTemplateName(context, defaultName);
                           if (name == null || name.trim().isEmpty) break;
-                          final tags = item.tags
-                              .map((e) => e.trim())
-                              .where((e) => e.isNotEmpty)
-                              .toSet()
-                              .toList(growable: false);
                           await templateRepository.upsert(
                             name: name.trim(),
                             scope: TemplateScope.global,
@@ -145,7 +140,7 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
                             defaultCoffeeDoseG: entry.coffeeDoseG,
                             defaultWaterTotalG: entry.waterTotalG,
                             steps: EntryActions.stepDraftsFromSteps(item.steps),
-                            tags: tags,
+                            tags: const [],
                           );
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -239,11 +234,6 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
                   const SizedBox(height: 8),
                   _InfoGrid(
                     children: [
-                        _InfoCard(
-                          label: 'Brew method',
-                          value: entry.brewMethod,
-                          icon: const Icon(Icons.coffee_maker_outlined)
-                        ),
                       _InfoCard(
                         label: 'Coffee dose',
                         value: DisplayFormatters.formatWeight(entry.coffeeDoseG),
@@ -259,6 +249,11 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
                         value: '1:${ratio.toStringAsFixed(1)}',
                         icon: const Icon(Icons.balance_outlined),
                       ),
+                       _InfoCard(
+                          label: 'Brew method',
+                          value: entry.brewMethod,
+                          icon: const Icon(Icons.coffee_maker_outlined)
+                        ),
                       if (temperature != null)
                         _InfoCard(
                           label: 'Water temperature',
