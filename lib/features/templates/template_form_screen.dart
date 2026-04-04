@@ -2,6 +2,7 @@ import 'package:coffee_journal/core/db/database_provider.dart';
 import 'package:coffee_journal/core/models/enums.dart';
 import 'package:coffee_journal/core/models/recipe_step_draft.dart';
 import 'package:coffee_journal/core/repositories/contracts.dart';
+import 'package:coffee_journal/core/utils/recipe_timeline.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -82,27 +83,27 @@ class _TemplateFormScreenState extends ConsumerState<TemplateFormScreen> {
             _waterController.text = record.template.defaultWaterTotalG?.toString() ?? '';
             _tagsController.text = record.tags.join(', ');
             _method = record.template.brewMethod;
-            _steps = record.steps
-                .map(
-                  (s) => RecipeStepDraft(
-                    type: RecipeStepType.values.firstWhere(
-                      (e) => e.name == s.type,
-                      orElse: () => RecipeStepType.custom,
-                    ),
-                    index: s.stepIndex,
-                    startSec: s.startSec,
-                    durationSec: s.durationSec,
-                    note: s.note,
-                    waterG: s.waterG,
-                    flowRateGPerSec: s.flowRateGPerSec,
-                    pressureBar: s.pressureBar,
-                    count: s.count,
-                    tool: s.tool,
-                    label: s.label,
-                    jsonPayload: s.jsonPayload,
+            _steps = RecipeTimeline.normalize(
+              record.steps.map(
+                (s) => RecipeStepDraft(
+                  type: RecipeStepType.values.firstWhere(
+                    (e) => e.name == s.type,
+                    orElse: () => RecipeStepType.custom,
                   ),
-                )
-                .toList(growable: false);
+                  index: s.stepIndex,
+                  startSec: s.startSec,
+                  durationSec: s.durationSec,
+                  note: s.note,
+                  waterG: s.waterG,
+                  flowRateGPerSec: s.flowRateGPerSec,
+                  pressureBar: s.pressureBar,
+                  count: s.count,
+                  tool: s.tool,
+                  label: s.label,
+                  jsonPayload: s.jsonPayload,
+                ),
+              ),
+            );
             _loaded = true;
           }
 
@@ -169,7 +170,10 @@ class _TemplateFormScreenState extends ConsumerState<TemplateFormScreen> {
                             final step = await _showStepDialog(context, index: _steps.length);
                             if (step == null) return;
                             setState(() {
-                              _steps = [..._steps, step.copyWith(index: _steps.length)];
+                              _steps = RecipeTimeline.normalize([
+                                ..._steps,
+                                step.copyWith(index: _steps.length),
+                              ]);
                             });
                           },
                           icon: const Icon(Icons.add),
@@ -192,24 +196,24 @@ class _TemplateFormScreenState extends ConsumerState<TemplateFormScreen> {
                             if (newIndex > oldIndex) newIndex -= 1;
                             final moved = _steps.removeAt(oldIndex);
                             _steps.insert(newIndex, moved);
-                            _steps = _steps
-                                .asMap()
-                                .entries
-                                .map((e) => e.value.copyWith(index: e.key))
-                                .toList(growable: false);
+                            _steps = RecipeTimeline.normalize(_steps);
                           });
                         },
                         itemBuilder: (context, index) {
                           final step = _steps[index];
+                          final title = step.type == RecipeStepType.custom &&
+                                  (step.label?.trim().isNotEmpty ?? false)
+                              ? step.label!.trim()
+                              : step.type.name;
                           return Card(
                             key: ValueKey('template-step-${step.index}-${step.type.name}-$index'),
                             child: ListTile(
-                              title: Text('${index + 1}. ${step.type.name}'),
+                              title: Text('${index + 1}. $title'),
                               subtitle: Text(
                                 [
-                                  if (step.waterG != null) '${step.waterG!.toStringAsFixed(1)} g water',
-                                  if (step.startSec != null) 'start ${step.startSec}s',
+                                  'start ${step.startSec ?? 0}s',
                                   if (step.durationSec != null) 'dur ${step.durationSec}s',
+                                  if (step.waterG != null) '${step.waterG!.toStringAsFixed(1)} g water',
                                   if (step.pressureBar != null)
                                     '${step.pressureBar!.toStringAsFixed(1)} bar',
                                   if (step.note != null && step.note!.trim().isNotEmpty) step.note!,
@@ -229,6 +233,7 @@ class _TemplateFormScreenState extends ConsumerState<TemplateFormScreen> {
                                       if (edited == null) return;
                                       setState(() {
                                         _steps[index] = edited.copyWith(index: index);
+                                        _steps = RecipeTimeline.normalize(_steps);
                                       });
                                     },
                                   ),
@@ -237,11 +242,7 @@ class _TemplateFormScreenState extends ConsumerState<TemplateFormScreen> {
                                     onPressed: () {
                                       setState(() {
                                         _steps.removeAt(index);
-                                        _steps = _steps
-                                            .asMap()
-                                            .entries
-                                            .map((e) => e.value.copyWith(index: e.key))
-                                            .toList(growable: false);
+                                        _steps = RecipeTimeline.normalize(_steps);
                                       });
                                     },
                                   ),
@@ -277,12 +278,12 @@ class _TemplateFormScreenState extends ConsumerState<TemplateFormScreen> {
   }) async {
     RecipeStepType type = initialStep?.type ?? RecipeStepType.pour;
     final waterController = TextEditingController(text: initialStep?.waterG?.toString() ?? '');
-    final startController = TextEditingController(text: initialStep?.startSec?.toString() ?? '');
     final durationController =
         TextEditingController(text: initialStep?.durationSec?.toString() ?? '');
     final pressureController =
         TextEditingController(text: initialStep?.pressureBar?.toString() ?? '');
     final noteController = TextEditingController(text: initialStep?.note ?? '');
+    final labelController = TextEditingController(text: initialStep?.label ?? '');
 
     return showDialog<RecipeStepDraft>(
       context: context,
@@ -303,15 +304,15 @@ class _TemplateFormScreenState extends ConsumerState<TemplateFormScreen> {
                           .toList(),
                       onChanged: (value) => setDialogState(() => type = value ?? type),
                     ),
+                    if (type == RecipeStepType.custom)
+                      TextField(
+                        controller: labelController,
+                        decoration: const InputDecoration(labelText: 'Custom label'),
+                      ),
                     TextField(
                       controller: waterController,
                       decoration: const InputDecoration(labelText: 'Water (g)'),
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    ),
-                    TextField(
-                      controller: startController,
-                      decoration: const InputDecoration(labelText: 'Start (sec)'),
-                      keyboardType: TextInputType.number,
                     ),
                     TextField(
                       controller: durationController,
@@ -342,9 +343,9 @@ class _TemplateFormScreenState extends ConsumerState<TemplateFormScreen> {
                         type: type,
                         index: index,
                         waterG: double.tryParse(waterController.text),
-                        startSec: int.tryParse(startController.text),
                         durationSec: int.tryParse(durationController.text),
                         pressureBar: double.tryParse(pressureController.text),
+                        label: _clean(labelController.text),
                         note: _clean(noteController.text),
                       ),
                     );
@@ -377,11 +378,7 @@ class _TemplateFormScreenState extends ConsumerState<TemplateFormScreen> {
       brewMethod: _method!,
       defaultCoffeeDoseG: double.tryParse(_doseController.text),
       defaultWaterTotalG: double.tryParse(_waterController.text),
-      steps: _steps
-          .asMap()
-          .entries
-          .map((e) => e.value.copyWith(index: e.key))
-          .toList(growable: false),
+      steps: RecipeTimeline.normalize(_steps),
       tags: _splitTags(_tagsController.text),
     );
 

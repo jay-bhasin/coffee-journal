@@ -2,6 +2,7 @@ import 'package:coffee_journal/core/db/database.dart';
 import 'package:coffee_journal/core/models/enums.dart';
 import 'package:coffee_journal/core/models/recipe_step_draft.dart';
 import 'package:coffee_journal/core/repositories/contracts.dart';
+import 'package:coffee_journal/core/utils/recipe_timeline.dart';
 
 class EntryActions {
   const EntryActions._();
@@ -49,26 +50,26 @@ class EntryActions {
   }
 
   static List<RecipeStepDraft> stepDraftsFromSteps(Iterable<EntryStep> steps) {
-    return steps
-        .map(
-          (s) => RecipeStepDraft(
-            type: RecipeStepType.values.firstWhere(
-              (e) => e.name == s.type,
-              orElse: () => RecipeStepType.custom,
-            ),
-            index: s.stepIndex,
-            startSec: s.startSec,
-            durationSec: s.durationSec,
-            note: s.note,
-            waterG: s.waterG,
-            flowRateGPerSec: s.flowRateGPerSec,
-            pressureBar: s.pressureBar,
-            count: s.count,
-            tool: s.tool,
-            label: s.label,
-            jsonPayload: s.jsonPayload,
+    return RecipeTimeline.normalize(
+      steps.map(
+        (s) => RecipeStepDraft(
+          type: RecipeStepType.values.firstWhere(
+            (e) => e.name == s.type,
+            orElse: () => RecipeStepType.custom,
           ),
-        )
-        .toList(growable: false);
+          index: s.stepIndex,
+          startSec: s.startSec,
+          durationSec: s.durationSec,
+          note: s.note,
+          waterG: s.waterG,
+          flowRateGPerSec: s.flowRateGPerSec,
+          pressureBar: s.pressureBar,
+          count: s.count,
+          tool: s.tool,
+          label: s.label,
+          jsonPayload: s.jsonPayload,
+        ),
+      ),
+    );
   }
 }

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:coffee_journal/core/db/database.dart';
 import 'package:coffee_journal/core/db/database_provider.dart';
 import 'package:coffee_journal/core/models/enums.dart';
 import 'package:coffee_journal/core/models/sensory_notes.dart';
@@ -296,76 +297,10 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
                     ],
                   ),
                   const Divider(height: 32),
-                  _SectionTitle(title: 'Recipe steps'),
-                  const SizedBox(height: 8),
-                  () {
-                    var cumulativeWater = 0.0;
-                    return Column(
-                      children: item.steps.asMap().entries.map((entryWithIndex) {
-                        final stepWater = entryWithIndex.value.waterG;
-                        if ((stepWater ?? 0) > 0) {
-                          cumulativeWater += stepWater!;
-                        }
-                        var hasNotes = entryWithIndex.value.pressureBar != null || !_isBlank(entryWithIndex.value.note) || !_isBlank(entryWithIndex.value.label);
-
-                        return _TimelineStepRow(
-                          marker: _StepTimelineMarker(
-                            isFirst: entryWithIndex.key == 0,
-                            isLast: false,
-                            startLabel: DisplayFormatters.formatDuration(
-                              entryWithIndex.value.startSec,
-                            ),
-                            waterLabel: (stepWater ?? 0) > 0 ? DisplayFormatters.formatWeight(cumulativeWater) : '',
-                          ),
-                          child: ListTile(
-                            leading: Text(
-                              "${entryWithIndex.value.stepIndex + 1}",
-                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                color: Theme.of(context).colorScheme.primary,
-                              ),
-                              
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if ((stepWater ?? 0) > 0) ... [
-                                    Icon(Icons.water_drop_outlined, size: 18),
-                                    SizedBox(width: 6),
-                                    Text(
-                                      DisplayFormatters.formatWeight(cumulativeWater),
-                                      style: Theme.of(context).textTheme.bodyMedium,
-                                    ),
-                                ]
-                              ],
-                            ),
-                            title: Text(
-                              entryWithIndex.value.type, // '${entryWithIndex.value.stepIndex + 1}. ${entryWithIndex.value.type}',
-                            ),
-                            subtitle: hasNotes ? Text(
-                              [
-                                if (entryWithIndex.value.pressureBar != null)
-                                  DisplayFormatters.formatPressure(
-                                    entryWithIndex.value.pressureBar!,
-                                  ),
-                                if (!_isBlank(entryWithIndex.value.note)) entryWithIndex.value.note,
-                                if (!_isBlank(entryWithIndex.value.label)) entryWithIndex.value.label,
-                              ].join(' • '),
-                            ) : null,
-                          ),
-                        );
-                      }).toList(growable: false),
-                    );
-                  }(),
-                  _TimelineStepRow(
-                    marker: _StepTimelineMarker(
-                      isFirst: false,
-                      isLast: true,
-                      startLabel: DisplayFormatters.formatDuration(brewTime),
-                      waterLabel: '',
-                    ),
-                    child: const ListTile(
-                      title: Text('End'),
-                    ),
+                  _RecipeStepsSection(
+                    steps: item.steps,
+                    brewTime: brewTime,
+                    isBlank: _isBlank,
                   ),
                   const Divider(height: 32),
                   _SectionTitle(title: 'Results'),
@@ -462,6 +397,143 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
   }
 
   bool _isBlank(String? value) => value == null || value.trim().isEmpty;
+}
+
+enum _WaterDisplayMode {
+  cumulative,
+  step,
+}
+
+class _RecipeStepsSection extends StatefulWidget {
+  const _RecipeStepsSection({
+    required this.steps,
+    required this.brewTime,
+    required this.isBlank,
+  });
+
+  final List<EntryStep> steps;
+  final int brewTime;
+  final bool Function(String?) isBlank;
+
+  @override
+  State<_RecipeStepsSection> createState() => _RecipeStepsSectionState();
+}
+
+class _RecipeStepsSectionState extends State<_RecipeStepsSection> {
+  _WaterDisplayMode _waterDisplayMode = _WaterDisplayMode.cumulative;
+
+  @override
+  Widget build(BuildContext context) {
+    final normalizedSteps = EntryActions.stepDraftsFromSteps(widget.steps);
+    final showEndStep =
+        normalizedSteps.isNotEmpty && (normalizedSteps.last.durationSec ?? 0) > 0;
+    var cumulativeWater = 0.0;
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            const Expanded(child: _SectionTitle(title: 'Recipe steps')),
+            SegmentedButton<_WaterDisplayMode>(
+              segments: const [
+                ButtonSegment<_WaterDisplayMode>(
+                  value: _WaterDisplayMode.cumulative,
+                  label: Text(
+                    'Σ',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                ButtonSegment<_WaterDisplayMode>(
+                  value: _WaterDisplayMode.step,
+                  label: Text(
+                    'Δ',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+              selected: {_waterDisplayMode},
+              showSelectedIcon: false,
+              onSelectionChanged: (selection) {
+                setState(() => _waterDisplayMode = selection.first);
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ...normalizedSteps.asMap().entries.map((entryWithIndex) {
+          final step = entryWithIndex.value;
+          final title = step.type == RecipeStepType.custom &&
+                  !widget.isBlank(step.label)
+              ? step.label!
+              : step.type.name;
+          final stepWater = step.waterG;
+          if ((stepWater ?? 0) > 0) {
+            cumulativeWater += stepWater!;
+          }
+
+          final displayedWater = _waterDisplayMode == _WaterDisplayMode.cumulative
+              ? cumulativeWater
+              : (stepWater ?? 0);
+          final hasWater = (stepWater ?? 0) > 0;
+          final hasNotes = step.pressureBar != null || !widget.isBlank(step.note);
+
+          return _TimelineStepRow(
+            marker: _StepTimelineMarker(
+              isFirst: entryWithIndex.key == 0,
+              isLast: !showEndStep && entryWithIndex.key == normalizedSteps.length - 1,
+              startLabel: DisplayFormatters.formatDuration(step.startSec),
+              waterLabel: hasWater
+                  ? DisplayFormatters.formatWeight(displayedWater)
+                  : '',
+            ),
+            child: ListTile(
+              leading: Text(
+                "${step.index + 1}",
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (hasWater) ...[
+                    const Icon(Icons.water_drop_outlined, size: 18),
+                    const SizedBox(width: 6),
+                    Text(
+                      DisplayFormatters.formatWeight(displayedWater),
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ]
+                ],
+              ),
+              title: Text(title),
+              subtitle: hasNotes
+                  ? Text(
+                      [
+                        if (step.pressureBar != null)
+                          DisplayFormatters.formatPressure(step.pressureBar!),
+                        if (!widget.isBlank(step.note)) step.note,
+                      ].join(' • '),
+                    )
+                  : null,
+            ),
+          );
+        }),
+        if (showEndStep)
+          _TimelineStepRow(
+            marker: _StepTimelineMarker(
+              isFirst: false,
+              isLast: true,
+              startLabel: DisplayFormatters.formatDuration(widget.brewTime),
+              waterLabel: '',
+            ),
+            child: const ListTile(
+              title: Text('End'),
+            ),
+          ),
+      ],
+    );
+  }
 }
 
 class _SectionTitle extends StatelessWidget {

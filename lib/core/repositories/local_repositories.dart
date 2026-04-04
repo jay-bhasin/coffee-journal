@@ -5,6 +5,7 @@ import 'package:coffee_journal/core/models/enums.dart';
 import 'package:coffee_journal/core/models/recipe_step_draft.dart';
 import 'package:coffee_journal/core/repositories/contracts.dart';
 import 'package:coffee_journal/core/search/search_indexer.dart';
+import 'package:coffee_journal/core/utils/recipe_timeline.dart';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
@@ -267,27 +268,27 @@ class LocalEntryRepository implements EntryRepository {
       miscNotes: existing.entry.miscNotes,
       agitationLevel: existing.entry.agitationLevel,
       extractionOutcome: ExtractionOutcome.unknown,
-      steps: existing.steps
-          .map(
-            (s) => RecipeStepDraft(
-              type: RecipeStepType.values.firstWhere(
-                (e) => e.name == s.type,
-                orElse: () => RecipeStepType.custom,
-              ),
-              index: s.stepIndex,
-              startSec: s.startSec,
-              durationSec: s.durationSec,
-              note: s.note,
-              waterG: s.waterG,
-              flowRateGPerSec: s.flowRateGPerSec,
-              pressureBar: s.pressureBar,
-              count: s.count,
-              tool: s.tool,
-              label: s.label,
-              jsonPayload: s.jsonPayload,
+      steps: RecipeTimeline.normalize(
+        existing.steps.map(
+          (s) => RecipeStepDraft(
+            type: RecipeStepType.values.firstWhere(
+              (e) => e.name == s.type,
+              orElse: () => RecipeStepType.custom,
             ),
-          )
-          .toList(),
+            index: s.stepIndex,
+            startSec: s.startSec,
+            durationSec: s.durationSec,
+            note: s.note,
+            waterG: s.waterG,
+            flowRateGPerSec: s.flowRateGPerSec,
+            pressureBar: s.pressureBar,
+            count: s.count,
+            tool: s.tool,
+            label: s.label,
+            jsonPayload: s.jsonPayload,
+          ),
+        ),
+      ),
       tags: existing.tags,
     );
   }
@@ -405,6 +406,7 @@ class LocalEntryRepository implements EntryRepository {
     required List<RecipeStepDraft> steps,
     List<String> tags = const [],
   }) async {
+    final normalizedSteps = RecipeTimeline.normalize(steps);
     final now = DateTime.now();
     final entityId = id ?? _uuid.v4();
     final existing = await (_db.select(
@@ -455,7 +457,7 @@ class LocalEntryRepository implements EntryRepository {
     await (_db.delete(
       _db.entrySteps,
     )..where((tbl) => tbl.entryId.equals(entityId))).go();
-    for (final step in steps) {
+    for (final step in normalizedSteps) {
       await _db
           .into(_db.entrySteps)
           .insert(
@@ -593,6 +595,7 @@ class LocalTemplateRepository implements TemplateRepository {
     List<String> tags = const [],
   }) async {
     await _normalizeTemplateScope();
+    final normalizedSteps = RecipeTimeline.normalize(steps);
     final now = DateTime.now();
     final entityId = id ?? _uuid.v4();
     final existing = await (_db.select(
@@ -621,7 +624,7 @@ class LocalTemplateRepository implements TemplateRepository {
     await (_db.delete(
       _db.templateSteps,
     )..where((tbl) => tbl.templateId.equals(entityId))).go();
-    for (final step in steps) {
+    for (final step in normalizedSteps) {
       await _db
           .into(_db.templateSteps)
           .insert(

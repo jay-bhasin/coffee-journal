@@ -6,17 +6,18 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   const calculator = BrewTimeCalculator();
 
-  test('uses max timeline when start times exist', () {
+  test('calculates brew time from derived cumulative durations', () {
     final steps = [
       RecipeStepDraft(type: RecipeStepType.bloom, index: 0, startSec: 0, durationSec: 30),
       RecipeStepDraft(type: RecipeStepType.pour, index: 1, startSec: 45, durationSec: 25),
     ];
 
-    expect(calculator.calculateAutoBrewTimeSec(steps), 70);
+    expect(calculator.calculateAutoBrewTimeSec(steps), 55);
   });
 
-  test('falls back to cumulative duration', () {
+  test('treats blank duration as zero-length step', () {
     final steps = [
+      RecipeStepDraft(type: RecipeStepType.stir, index: 0),
       RecipeStepDraft(type: RecipeStepType.wait, index: 0, durationSec: 20),
       RecipeStepDraft(type: RecipeStepType.wait, index: 1, durationSec: 35),
     ];

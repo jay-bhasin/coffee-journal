@@ -1,4 +1,5 @@
 import 'package:coffee_journal/core/models/recipe_step_draft.dart';
+import 'package:coffee_journal/core/utils/recipe_timeline.dart';
 
 class BrewTimeCalculator {
   const BrewTimeCalculator();
@@ -6,21 +7,17 @@ class BrewTimeCalculator {
   int calculateAutoBrewTimeSec(List<RecipeStepDraft> steps) {
     if (steps.isEmpty) return 0;
 
+    final normalized = RecipeTimeline.normalize(steps);
     var maxTimeline = 0;
-    var cumulative = 0;
 
-    for (final step in steps) {
+    for (final step in normalized) {
       final duration = step.durationSec ?? 0;
-      final start = step.startSec;
-      if (start != null) {
-        final end = start + duration;
-        if (end > maxTimeline) {
-          maxTimeline = end;
-        }
+      final end = (step.startSec ?? 0) + duration;
+      if (end > maxTimeline) {
+        maxTimeline = end;
       }
-      cumulative += duration;
     }
 
-    return maxTimeline > 0 ? maxTimeline : cumulative;
+    return maxTimeline;
   }
 }
