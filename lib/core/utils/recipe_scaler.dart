@@ -10,6 +10,16 @@ class RecipeScaler {
     return waterTotalG / coffeeDoseG;
   }
 
+  double computeWater({required double dose, required double ratio}) {
+    if (dose <= 0 || ratio <= 0) return 0;
+    return dose * ratio;
+  }
+
+  double computeDose({required double water, required double ratio}) {
+    if (water <= 0 || ratio <= 0) return 0;
+    return water / ratio;
+  }
+
   double counterpartForLockedRatio({
     required double changedValue,
     required bool changedCoffeeDose,
