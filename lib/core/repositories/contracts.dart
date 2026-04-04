@@ -68,6 +68,7 @@ abstract class CoffeeRepository {
     String? altitudeM,
     DateTime? roastDate,
     String? tastingNotes,
+    String? notes,
     List<String> tags,
     bool isArchived,
   });
@@ -93,6 +94,7 @@ abstract class EntryRepository {
     required double coffeeDoseG,
     required double waterTotalG,
     double? waterTempC,
+    String? waterCondition,
     String? grinder,
     String? grindSetting,
     double? yieldG,

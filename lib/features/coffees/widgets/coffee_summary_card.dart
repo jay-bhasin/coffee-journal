@@ -2,7 +2,7 @@ import 'package:coffee_journal/core/repositories/contracts.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-class CoffeeSummaryCard extends StatelessWidget {
+class CoffeeSummaryCard extends StatefulWidget {
   const CoffeeSummaryCard({
     super.key,
     required this.record,
@@ -15,8 +15,15 @@ class CoffeeSummaryCard extends StatelessWidget {
   final bool showDetails;
 
   @override
+  State<CoffeeSummaryCard> createState() => _CoffeeSummaryCardState();
+}
+
+class _CoffeeSummaryCardState extends State<CoffeeSummaryCard> {
+  bool _showNotes = false;
+
+  @override
   Widget build(BuildContext context) {
-    final coffee = record.coffee;
+    final coffee = widget.record.coffee;
     final location = _formatLocation(coffee.region, coffee.country);
     final metaChips = <String>[
       if (!_isBlank(location)) location!,
@@ -30,11 +37,12 @@ class CoffeeSummaryCard extends StatelessWidget {
     ].join(' • ');
     final secondaryDetailLine = <String>[
       if (coffee.roastDate != null) 'Roasted ${DateFormat.yMMMd().format(coffee.roastDate!)}',
-      if (record.tags.isNotEmpty) 'Tags: ${record.tags.join(', ')}',
+      if (widget.record.tags.isNotEmpty) 'Tags: ${widget.record.tags.join(', ')}',
     ].join(' • ');
+    final hasNotes = !_isBlank(coffee.notes);
 
     return Container(
-      margin: margin,
+      margin: widget.margin,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerHigh,
@@ -43,18 +51,38 @@ class CoffeeSummaryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            coffee.name,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      coffee.name,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      coffee.roaster,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
                 ),
+              ),
+              if (widget.showDetails && hasNotes)
+                IconButton(
+                  tooltip: _showNotes ? 'Hide coffee notes' : 'Show coffee notes',
+                  onPressed: () => setState(() => _showNotes = !_showNotes),
+                  icon: Icon(
+                    _showNotes ? Icons.sticky_note_2 : Icons.sticky_note_2_outlined,
+                  ),
+                ),
+            ],
           ),
-          const SizedBox(height: 2),
-          Text(
-            coffee.roaster,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          if (showDetails) ...[
+          if (widget.showDetails) ...[
             if (metaChips.isNotEmpty) ...[
               const SizedBox(height: 8),
               Wrap(
@@ -70,6 +98,17 @@ class CoffeeSummaryCard extends StatelessWidget {
                       ),
                     )
                     .toList(growable: false),
+              ),
+            ],
+            if (_showNotes && hasNotes) ...[
+              const SizedBox(height: 8),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOut,
+                child: Text(
+                  coffee.notes!,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
               ),
             ],
             if (!_isBlank(coffee.tastingNotes)) ...[

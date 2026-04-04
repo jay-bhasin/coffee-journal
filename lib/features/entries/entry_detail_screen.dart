@@ -260,6 +260,12 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
                           value: temperature,
                           icon: const Icon(Icons.thermostat_outlined),
                         ),
+                      if (entry.waterCondition != null)
+                        _InfoCard(
+                          label: 'Water condition',
+                          value: entry.waterCondition!,
+                          icon: const Icon(Icons.shower_outlined),
+                        ),
                       if (grinder != null)
                         _InfoCard(
                           label: 'Grind',

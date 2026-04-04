@@ -18,6 +18,13 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
   final TextEditingController _searchController = TextEditingController();
   CoffeeSortOption _sort = CoffeeSortOption.updatedAt;
   bool _showSearch = false;
+  late Future<_HomeData> _homeDataFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _homeDataFuture = _buildHomeDataFuture();
+  }
 
   @override
   void dispose() {
@@ -28,21 +35,21 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
   @override
   Widget build(BuildContext context) {
     final repository = ref.watch(coffeeRepositoryProvider);
-    final db = ref.watch(appDatabaseProvider);
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           await context.push('/coffee/new');
-          if (mounted) setState(() {});
+          _refreshHomeData();
         },
         icon: const Icon(Icons.add, size: 20),
         label: const Text('Add coffee'),
       ),
       body: FutureBuilder<_HomeData>(
-        future: _loadHomeData(repository, db),
+        future: _homeDataFuture,
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          if (snapshot.connectionState == ConnectionState.waiting &&
+              !snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
 
@@ -66,6 +73,7 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
                         _showSearch = !_showSearch;
                         if (!_showSearch && _searchController.text.isNotEmpty) {
                           _searchController.clear();
+                          _homeDataFuture = _buildHomeDataFuture();
                         }
                       });
                     },
@@ -100,7 +108,7 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
                                 suffixIcon: IconButton(
                                   onPressed: () {
                                     _searchController.clear();
-                                    setState(() {});
+                                    _refreshHomeData();
                                   },
                                   icon: const Icon(Icons.clear),
                                 ),
@@ -108,7 +116,7 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
                                   vertical: 14,
                                 ),
                               ),
-                              onChanged: (_) => setState(() {}),
+                              onChanged: (_) => _refreshHomeData(),
                             ),
                           ),
                         )
@@ -153,8 +161,10 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
                           ),
                           const Spacer(),
                           PopupMenuButton<CoffeeSortOption>(
-                            onSelected: (value) =>
-                                setState(() => _sort = value),
+                            onSelected: (value) {
+                              setState(() => _sort = value);
+                              _refreshHomeData();
+                            },
                             itemBuilder: (context) => CoffeeSortOption.values
                                 .map(
                                   (e) => PopupMenuItem(
@@ -196,7 +206,7 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
                                 ),
                                 onDeleted: () {
                                   _searchController.clear();
-                                  setState(() {});
+                                  _refreshHomeData();
                                 },
                               ),
                           ],
@@ -213,7 +223,7 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
                     hasQuery: _searchController.text.trim().isNotEmpty,
                     onAddCoffee: () async {
                       await context.push('/coffee/new');
-                      if (mounted) setState(() {});
+                      _refreshHomeData();
                     },
                   ),
                 )
@@ -230,17 +240,17 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
                           item: item,
                           onTap: () async {
                             await context.push('/coffee/${item.coffee.id}');
-                            if (mounted) setState(() {});
+                            _refreshHomeData();
                           },
                           onEdit: () async {
                             await context.push(
                               '/coffee/${item.coffee.id}/edit',
                             );
-                            if (mounted) setState(() {});
+                            _refreshHomeData();
                           },
                           onDelete: () async {
                             await repository.delete(item.coffee.id);
-                            if (mounted) setState(() {});
+                            _refreshHomeData();
                           },
                         ),
                       );
@@ -252,6 +262,19 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
         },
       ),
     );
+  }
+
+  void _refreshHomeData() {
+    if (!mounted) return;
+    setState(() {
+      _homeDataFuture = _buildHomeDataFuture();
+    });
+  }
+
+  Future<_HomeData> _buildHomeDataFuture() {
+    final repository = ref.read(coffeeRepositoryProvider);
+    final db = ref.read(appDatabaseProvider);
+    return _loadHomeData(repository, db);
   }
 
   Future<_HomeData> _loadHomeData(
@@ -288,6 +311,8 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
 
   String _sortLabel(CoffeeSortOption sort) {
     switch (sort) {
+      case CoffeeSortOption.updatedAt:
+        return 'Recent activity';
       case CoffeeSortOption.name:
         return 'Name';
       case CoffeeSortOption.roaster:
@@ -296,8 +321,7 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
         return 'Origin';
       case CoffeeSortOption.roastDate:
         return 'Roast date';
-      case CoffeeSortOption.updatedAt:
-        return 'Recent activity';
+
     }
   }
 }

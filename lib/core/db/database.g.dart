@@ -132,6 +132,15 @@ class $CoffeesTable extends Coffees with TableInfo<$CoffeesTable, Coffee> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _isArchivedMeta = const VerificationMeta(
     'isArchived',
   );
@@ -195,6 +204,7 @@ class $CoffeesTable extends Coffees with TableInfo<$CoffeesTable, Coffee> {
     altitudeM,
     roastDate,
     tastingNotes,
+    notes,
     isArchived,
     searchText,
     createdAt,
@@ -290,6 +300,12 @@ class $CoffeesTable extends Coffees with TableInfo<$CoffeesTable, Coffee> {
         ),
       );
     }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
     if (data.containsKey('is_archived')) {
       context.handle(
         _isArchivedMeta,
@@ -375,6 +391,10 @@ class $CoffeesTable extends Coffees with TableInfo<$CoffeesTable, Coffee> {
         DriftSqlType.string,
         data['${effectivePrefix}tasting_notes'],
       ),
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
       isArchived: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_archived'],
@@ -413,6 +433,7 @@ class Coffee extends DataClass implements Insertable<Coffee> {
   final String? altitudeM;
   final DateTime? roastDate;
   final String? tastingNotes;
+  final String? notes;
   final bool isArchived;
   final String searchText;
   final DateTime createdAt;
@@ -430,6 +451,7 @@ class Coffee extends DataClass implements Insertable<Coffee> {
     this.altitudeM,
     this.roastDate,
     this.tastingNotes,
+    this.notes,
     required this.isArchived,
     required this.searchText,
     required this.createdAt,
@@ -468,6 +490,9 @@ class Coffee extends DataClass implements Insertable<Coffee> {
     if (!nullToAbsent || tastingNotes != null) {
       map['tasting_notes'] = Variable<String>(tastingNotes);
     }
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
     map['is_archived'] = Variable<bool>(isArchived);
     map['search_text'] = Variable<String>(searchText);
     map['created_at'] = Variable<DateTime>(createdAt);
@@ -505,6 +530,9 @@ class Coffee extends DataClass implements Insertable<Coffee> {
       tastingNotes: tastingNotes == null && nullToAbsent
           ? const Value.absent()
           : Value(tastingNotes),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
       isArchived: Value(isArchived),
       searchText: Value(searchText),
       createdAt: Value(createdAt),
@@ -530,6 +558,7 @@ class Coffee extends DataClass implements Insertable<Coffee> {
       altitudeM: serializer.fromJson<String?>(json['altitudeM']),
       roastDate: serializer.fromJson<DateTime?>(json['roastDate']),
       tastingNotes: serializer.fromJson<String?>(json['tastingNotes']),
+      notes: serializer.fromJson<String?>(json['notes']),
       isArchived: serializer.fromJson<bool>(json['isArchived']),
       searchText: serializer.fromJson<String>(json['searchText']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -552,6 +581,7 @@ class Coffee extends DataClass implements Insertable<Coffee> {
       'altitudeM': serializer.toJson<String?>(altitudeM),
       'roastDate': serializer.toJson<DateTime?>(roastDate),
       'tastingNotes': serializer.toJson<String?>(tastingNotes),
+      'notes': serializer.toJson<String?>(notes),
       'isArchived': serializer.toJson<bool>(isArchived),
       'searchText': serializer.toJson<String>(searchText),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -572,6 +602,7 @@ class Coffee extends DataClass implements Insertable<Coffee> {
     Value<String?> altitudeM = const Value.absent(),
     Value<DateTime?> roastDate = const Value.absent(),
     Value<String?> tastingNotes = const Value.absent(),
+    Value<String?> notes = const Value.absent(),
     bool? isArchived,
     String? searchText,
     DateTime? createdAt,
@@ -589,6 +620,7 @@ class Coffee extends DataClass implements Insertable<Coffee> {
     altitudeM: altitudeM.present ? altitudeM.value : this.altitudeM,
     roastDate: roastDate.present ? roastDate.value : this.roastDate,
     tastingNotes: tastingNotes.present ? tastingNotes.value : this.tastingNotes,
+    notes: notes.present ? notes.value : this.notes,
     isArchived: isArchived ?? this.isArchived,
     searchText: searchText ?? this.searchText,
     createdAt: createdAt ?? this.createdAt,
@@ -610,6 +642,7 @@ class Coffee extends DataClass implements Insertable<Coffee> {
       tastingNotes: data.tastingNotes.present
           ? data.tastingNotes.value
           : this.tastingNotes,
+      notes: data.notes.present ? data.notes.value : this.notes,
       isArchived: data.isArchived.present
           ? data.isArchived.value
           : this.isArchived,
@@ -636,6 +669,7 @@ class Coffee extends DataClass implements Insertable<Coffee> {
           ..write('altitudeM: $altitudeM, ')
           ..write('roastDate: $roastDate, ')
           ..write('tastingNotes: $tastingNotes, ')
+          ..write('notes: $notes, ')
           ..write('isArchived: $isArchived, ')
           ..write('searchText: $searchText, ')
           ..write('createdAt: $createdAt, ')
@@ -658,6 +692,7 @@ class Coffee extends DataClass implements Insertable<Coffee> {
     altitudeM,
     roastDate,
     tastingNotes,
+    notes,
     isArchived,
     searchText,
     createdAt,
@@ -679,6 +714,7 @@ class Coffee extends DataClass implements Insertable<Coffee> {
           other.altitudeM == this.altitudeM &&
           other.roastDate == this.roastDate &&
           other.tastingNotes == this.tastingNotes &&
+          other.notes == this.notes &&
           other.isArchived == this.isArchived &&
           other.searchText == this.searchText &&
           other.createdAt == this.createdAt &&
@@ -698,6 +734,7 @@ class CoffeesCompanion extends UpdateCompanion<Coffee> {
   final Value<String?> altitudeM;
   final Value<DateTime?> roastDate;
   final Value<String?> tastingNotes;
+  final Value<String?> notes;
   final Value<bool> isArchived;
   final Value<String> searchText;
   final Value<DateTime> createdAt;
@@ -716,6 +753,7 @@ class CoffeesCompanion extends UpdateCompanion<Coffee> {
     this.altitudeM = const Value.absent(),
     this.roastDate = const Value.absent(),
     this.tastingNotes = const Value.absent(),
+    this.notes = const Value.absent(),
     this.isArchived = const Value.absent(),
     this.searchText = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -735,6 +773,7 @@ class CoffeesCompanion extends UpdateCompanion<Coffee> {
     this.altitudeM = const Value.absent(),
     this.roastDate = const Value.absent(),
     this.tastingNotes = const Value.absent(),
+    this.notes = const Value.absent(),
     this.isArchived = const Value.absent(),
     this.searchText = const Value.absent(),
     required DateTime createdAt,
@@ -758,6 +797,7 @@ class CoffeesCompanion extends UpdateCompanion<Coffee> {
     Expression<String>? altitudeM,
     Expression<DateTime>? roastDate,
     Expression<String>? tastingNotes,
+    Expression<String>? notes,
     Expression<bool>? isArchived,
     Expression<String>? searchText,
     Expression<DateTime>? createdAt,
@@ -777,6 +817,7 @@ class CoffeesCompanion extends UpdateCompanion<Coffee> {
       if (altitudeM != null) 'altitude_m': altitudeM,
       if (roastDate != null) 'roast_date': roastDate,
       if (tastingNotes != null) 'tasting_notes': tastingNotes,
+      if (notes != null) 'notes': notes,
       if (isArchived != null) 'is_archived': isArchived,
       if (searchText != null) 'search_text': searchText,
       if (createdAt != null) 'created_at': createdAt,
@@ -798,6 +839,7 @@ class CoffeesCompanion extends UpdateCompanion<Coffee> {
     Value<String?>? altitudeM,
     Value<DateTime?>? roastDate,
     Value<String?>? tastingNotes,
+    Value<String?>? notes,
     Value<bool>? isArchived,
     Value<String>? searchText,
     Value<DateTime>? createdAt,
@@ -817,6 +859,7 @@ class CoffeesCompanion extends UpdateCompanion<Coffee> {
       altitudeM: altitudeM ?? this.altitudeM,
       roastDate: roastDate ?? this.roastDate,
       tastingNotes: tastingNotes ?? this.tastingNotes,
+      notes: notes ?? this.notes,
       isArchived: isArchived ?? this.isArchived,
       searchText: searchText ?? this.searchText,
       createdAt: createdAt ?? this.createdAt,
@@ -864,6 +907,9 @@ class CoffeesCompanion extends UpdateCompanion<Coffee> {
     if (tastingNotes.present) {
       map['tasting_notes'] = Variable<String>(tastingNotes.value);
     }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
     if (isArchived.present) {
       map['is_archived'] = Variable<bool>(isArchived.value);
     }
@@ -897,6 +943,7 @@ class CoffeesCompanion extends UpdateCompanion<Coffee> {
           ..write('altitudeM: $altitudeM, ')
           ..write('roastDate: $roastDate, ')
           ..write('tastingNotes: $tastingNotes, ')
+          ..write('notes: $notes, ')
           ..write('isArchived: $isArchived, ')
           ..write('searchText: $searchText, ')
           ..write('createdAt: $createdAt, ')
@@ -1001,6 +1048,17 @@ class $EntriesTable extends Entries with TableInfo<$EntriesTable, Entry> {
     aliasedName,
     true,
     type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _waterConditionMeta = const VerificationMeta(
+    'waterCondition',
+  );
+  @override
+  late final GeneratedColumn<String> waterCondition = GeneratedColumn<String>(
+    'water_condition',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
   static const VerificationMeta _grinderMeta = const VerificationMeta(
@@ -1191,6 +1249,7 @@ class $EntriesTable extends Entries with TableInfo<$EntriesTable, Entry> {
     coffeeDoseG,
     waterTotalG,
     waterTempC,
+    waterCondition,
     grinder,
     grindSetting,
     yieldG,
@@ -1283,6 +1342,15 @@ class $EntriesTable extends Entries with TableInfo<$EntriesTable, Entry> {
         waterTempC.isAcceptableOrUnknown(
           data['water_temp_c']!,
           _waterTempCMeta,
+        ),
+      );
+    }
+    if (data.containsKey('water_condition')) {
+      context.handle(
+        _waterConditionMeta,
+        waterCondition.isAcceptableOrUnknown(
+          data['water_condition']!,
+          _waterConditionMeta,
         ),
       );
     }
@@ -1457,6 +1525,10 @@ class $EntriesTable extends Entries with TableInfo<$EntriesTable, Entry> {
         DriftSqlType.double,
         data['${effectivePrefix}water_temp_c'],
       ),
+      waterCondition: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}water_condition'],
+      ),
       grinder: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}grinder'],
@@ -1539,6 +1611,7 @@ class Entry extends DataClass implements Insertable<Entry> {
   final double coffeeDoseG;
   final double waterTotalG;
   final double? waterTempC;
+  final String? waterCondition;
   final String? grinder;
   final String? grindSetting;
   final double? yieldG;
@@ -1564,6 +1637,7 @@ class Entry extends DataClass implements Insertable<Entry> {
     required this.coffeeDoseG,
     required this.waterTotalG,
     this.waterTempC,
+    this.waterCondition,
     this.grinder,
     this.grindSetting,
     this.yieldG,
@@ -1593,6 +1667,9 @@ class Entry extends DataClass implements Insertable<Entry> {
     map['water_total_g'] = Variable<double>(waterTotalG);
     if (!nullToAbsent || waterTempC != null) {
       map['water_temp_c'] = Variable<double>(waterTempC);
+    }
+    if (!nullToAbsent || waterCondition != null) {
+      map['water_condition'] = Variable<String>(waterCondition);
     }
     if (!nullToAbsent || grinder != null) {
       map['grinder'] = Variable<String>(grinder);
@@ -1647,6 +1724,9 @@ class Entry extends DataClass implements Insertable<Entry> {
       waterTempC: waterTempC == null && nullToAbsent
           ? const Value.absent()
           : Value(waterTempC),
+      waterCondition: waterCondition == null && nullToAbsent
+          ? const Value.absent()
+          : Value(waterCondition),
       grinder: grinder == null && nullToAbsent
           ? const Value.absent()
           : Value(grinder),
@@ -1702,6 +1782,7 @@ class Entry extends DataClass implements Insertable<Entry> {
       coffeeDoseG: serializer.fromJson<double>(json['coffeeDoseG']),
       waterTotalG: serializer.fromJson<double>(json['waterTotalG']),
       waterTempC: serializer.fromJson<double?>(json['waterTempC']),
+      waterCondition: serializer.fromJson<String?>(json['waterCondition']),
       grinder: serializer.fromJson<String?>(json['grinder']),
       grindSetting: serializer.fromJson<String?>(json['grindSetting']),
       yieldG: serializer.fromJson<double?>(json['yieldG']),
@@ -1732,6 +1813,7 @@ class Entry extends DataClass implements Insertable<Entry> {
       'coffeeDoseG': serializer.toJson<double>(coffeeDoseG),
       'waterTotalG': serializer.toJson<double>(waterTotalG),
       'waterTempC': serializer.toJson<double?>(waterTempC),
+      'waterCondition': serializer.toJson<String?>(waterCondition),
       'grinder': serializer.toJson<String?>(grinder),
       'grindSetting': serializer.toJson<String?>(grindSetting),
       'yieldG': serializer.toJson<double?>(yieldG),
@@ -1760,6 +1842,7 @@ class Entry extends DataClass implements Insertable<Entry> {
     double? coffeeDoseG,
     double? waterTotalG,
     Value<double?> waterTempC = const Value.absent(),
+    Value<String?> waterCondition = const Value.absent(),
     Value<String?> grinder = const Value.absent(),
     Value<String?> grindSetting = const Value.absent(),
     Value<double?> yieldG = const Value.absent(),
@@ -1785,6 +1868,9 @@ class Entry extends DataClass implements Insertable<Entry> {
     coffeeDoseG: coffeeDoseG ?? this.coffeeDoseG,
     waterTotalG: waterTotalG ?? this.waterTotalG,
     waterTempC: waterTempC.present ? waterTempC.value : this.waterTempC,
+    waterCondition: waterCondition.present
+        ? waterCondition.value
+        : this.waterCondition,
     grinder: grinder.present ? grinder.value : this.grinder,
     grindSetting: grindSetting.present ? grindSetting.value : this.grindSetting,
     yieldG: yieldG.present ? yieldG.value : this.yieldG,
@@ -1826,6 +1912,9 @@ class Entry extends DataClass implements Insertable<Entry> {
       waterTempC: data.waterTempC.present
           ? data.waterTempC.value
           : this.waterTempC,
+      waterCondition: data.waterCondition.present
+          ? data.waterCondition.value
+          : this.waterCondition,
       grinder: data.grinder.present ? data.grinder.value : this.grinder,
       grindSetting: data.grindSetting.present
           ? data.grindSetting.value
@@ -1878,6 +1967,7 @@ class Entry extends DataClass implements Insertable<Entry> {
           ..write('coffeeDoseG: $coffeeDoseG, ')
           ..write('waterTotalG: $waterTotalG, ')
           ..write('waterTempC: $waterTempC, ')
+          ..write('waterCondition: $waterCondition, ')
           ..write('grinder: $grinder, ')
           ..write('grindSetting: $grindSetting, ')
           ..write('yieldG: $yieldG, ')
@@ -1908,6 +1998,7 @@ class Entry extends DataClass implements Insertable<Entry> {
     coffeeDoseG,
     waterTotalG,
     waterTempC,
+    waterCondition,
     grinder,
     grindSetting,
     yieldG,
@@ -1937,6 +2028,7 @@ class Entry extends DataClass implements Insertable<Entry> {
           other.coffeeDoseG == this.coffeeDoseG &&
           other.waterTotalG == this.waterTotalG &&
           other.waterTempC == this.waterTempC &&
+          other.waterCondition == this.waterCondition &&
           other.grinder == this.grinder &&
           other.grindSetting == this.grindSetting &&
           other.yieldG == this.yieldG &&
@@ -1964,6 +2056,7 @@ class EntriesCompanion extends UpdateCompanion<Entry> {
   final Value<double> coffeeDoseG;
   final Value<double> waterTotalG;
   final Value<double?> waterTempC;
+  final Value<String?> waterCondition;
   final Value<String?> grinder;
   final Value<String?> grindSetting;
   final Value<double?> yieldG;
@@ -1990,6 +2083,7 @@ class EntriesCompanion extends UpdateCompanion<Entry> {
     this.coffeeDoseG = const Value.absent(),
     this.waterTotalG = const Value.absent(),
     this.waterTempC = const Value.absent(),
+    this.waterCondition = const Value.absent(),
     this.grinder = const Value.absent(),
     this.grindSetting = const Value.absent(),
     this.yieldG = const Value.absent(),
@@ -2017,6 +2111,7 @@ class EntriesCompanion extends UpdateCompanion<Entry> {
     required double coffeeDoseG,
     required double waterTotalG,
     this.waterTempC = const Value.absent(),
+    this.waterCondition = const Value.absent(),
     this.grinder = const Value.absent(),
     this.grindSetting = const Value.absent(),
     this.yieldG = const Value.absent(),
@@ -2051,6 +2146,7 @@ class EntriesCompanion extends UpdateCompanion<Entry> {
     Expression<double>? coffeeDoseG,
     Expression<double>? waterTotalG,
     Expression<double>? waterTempC,
+    Expression<String>? waterCondition,
     Expression<String>? grinder,
     Expression<String>? grindSetting,
     Expression<double>? yieldG,
@@ -2078,6 +2174,7 @@ class EntriesCompanion extends UpdateCompanion<Entry> {
       if (coffeeDoseG != null) 'coffee_dose_g': coffeeDoseG,
       if (waterTotalG != null) 'water_total_g': waterTotalG,
       if (waterTempC != null) 'water_temp_c': waterTempC,
+      if (waterCondition != null) 'water_condition': waterCondition,
       if (grinder != null) 'grinder': grinder,
       if (grindSetting != null) 'grind_setting': grindSetting,
       if (yieldG != null) 'yield_g': yieldG,
@@ -2107,6 +2204,7 @@ class EntriesCompanion extends UpdateCompanion<Entry> {
     Value<double>? coffeeDoseG,
     Value<double>? waterTotalG,
     Value<double?>? waterTempC,
+    Value<String?>? waterCondition,
     Value<String?>? grinder,
     Value<String?>? grindSetting,
     Value<double?>? yieldG,
@@ -2134,6 +2232,7 @@ class EntriesCompanion extends UpdateCompanion<Entry> {
       coffeeDoseG: coffeeDoseG ?? this.coffeeDoseG,
       waterTotalG: waterTotalG ?? this.waterTotalG,
       waterTempC: waterTempC ?? this.waterTempC,
+      waterCondition: waterCondition ?? this.waterCondition,
       grinder: grinder ?? this.grinder,
       grindSetting: grindSetting ?? this.grindSetting,
       yieldG: yieldG ?? this.yieldG,
@@ -2180,6 +2279,9 @@ class EntriesCompanion extends UpdateCompanion<Entry> {
     }
     if (waterTempC.present) {
       map['water_temp_c'] = Variable<double>(waterTempC.value);
+    }
+    if (waterCondition.present) {
+      map['water_condition'] = Variable<String>(waterCondition.value);
     }
     if (grinder.present) {
       map['grinder'] = Variable<String>(grinder.value);
@@ -2246,6 +2348,7 @@ class EntriesCompanion extends UpdateCompanion<Entry> {
           ..write('coffeeDoseG: $coffeeDoseG, ')
           ..write('waterTotalG: $waterTotalG, ')
           ..write('waterTempC: $waterTempC, ')
+          ..write('waterCondition: $waterCondition, ')
           ..write('grinder: $grinder, ')
           ..write('grindSetting: $grindSetting, ')
           ..write('yieldG: $yieldG, ')
@@ -6205,6 +6308,7 @@ typedef $$CoffeesTableCreateCompanionBuilder =
       Value<String?> altitudeM,
       Value<DateTime?> roastDate,
       Value<String?> tastingNotes,
+      Value<String?> notes,
       Value<bool> isArchived,
       Value<String> searchText,
       required DateTime createdAt,
@@ -6225,6 +6329,7 @@ typedef $$CoffeesTableUpdateCompanionBuilder =
       Value<String?> altitudeM,
       Value<DateTime?> roastDate,
       Value<String?> tastingNotes,
+      Value<String?> notes,
       Value<bool> isArchived,
       Value<String> searchText,
       Value<DateTime> createdAt,
@@ -6358,6 +6463,11 @@ class $$CoffeesTableFilterComposer
 
   ColumnFilters<String> get tastingNotes => $composableBuilder(
     column: $table.tastingNotes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6526,6 +6636,11 @@ class $$CoffeesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isArchived => $composableBuilder(
     column: $table.isArchived,
     builder: (column) => ColumnOrderings(column),
@@ -6593,6 +6708,9 @@ class $$CoffeesTableAnnotationComposer
     column: $table.tastingNotes,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
 
   GeneratedColumn<bool> get isArchived => $composableBuilder(
     column: $table.isArchived,
@@ -6730,6 +6848,7 @@ class $$CoffeesTableTableManager
                 Value<String?> altitudeM = const Value.absent(),
                 Value<DateTime?> roastDate = const Value.absent(),
                 Value<String?> tastingNotes = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
                 Value<bool> isArchived = const Value.absent(),
                 Value<String> searchText = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -6748,6 +6867,7 @@ class $$CoffeesTableTableManager
                 altitudeM: altitudeM,
                 roastDate: roastDate,
                 tastingNotes: tastingNotes,
+                notes: notes,
                 isArchived: isArchived,
                 searchText: searchText,
                 createdAt: createdAt,
@@ -6768,6 +6888,7 @@ class $$CoffeesTableTableManager
                 Value<String?> altitudeM = const Value.absent(),
                 Value<DateTime?> roastDate = const Value.absent(),
                 Value<String?> tastingNotes = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
                 Value<bool> isArchived = const Value.absent(),
                 Value<String> searchText = const Value.absent(),
                 required DateTime createdAt,
@@ -6786,6 +6907,7 @@ class $$CoffeesTableTableManager
                 altitudeM: altitudeM,
                 roastDate: roastDate,
                 tastingNotes: tastingNotes,
+                notes: notes,
                 isArchived: isArchived,
                 searchText: searchText,
                 createdAt: createdAt,
@@ -6911,6 +7033,7 @@ typedef $$EntriesTableCreateCompanionBuilder =
       required double coffeeDoseG,
       required double waterTotalG,
       Value<double?> waterTempC,
+      Value<String?> waterCondition,
       Value<String?> grinder,
       Value<String?> grindSetting,
       Value<double?> yieldG,
@@ -6939,6 +7062,7 @@ typedef $$EntriesTableUpdateCompanionBuilder =
       Value<double> coffeeDoseG,
       Value<double> waterTotalG,
       Value<double?> waterTempC,
+      Value<String?> waterCondition,
       Value<String?> grinder,
       Value<String?> grindSetting,
       Value<double?> yieldG,
@@ -7057,6 +7181,11 @@ class $$EntriesTableFilterComposer
 
   ColumnFilters<double> get waterTempC => $composableBuilder(
     column: $table.waterTempC,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get waterCondition => $composableBuilder(
+    column: $table.waterCondition,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7258,6 +7387,11 @@ class $$EntriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get waterCondition => $composableBuilder(
+    column: $table.waterCondition,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get grinder => $composableBuilder(
     column: $table.grinder,
     builder: (column) => ColumnOrderings(column),
@@ -7397,6 +7531,11 @@ class $$EntriesTableAnnotationComposer
 
   GeneratedColumn<double> get waterTempC => $composableBuilder(
     column: $table.waterTempC,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get waterCondition => $composableBuilder(
+    column: $table.waterCondition,
     builder: (column) => column,
   );
 
@@ -7584,6 +7723,7 @@ class $$EntriesTableTableManager
                 Value<double> coffeeDoseG = const Value.absent(),
                 Value<double> waterTotalG = const Value.absent(),
                 Value<double?> waterTempC = const Value.absent(),
+                Value<String?> waterCondition = const Value.absent(),
                 Value<String?> grinder = const Value.absent(),
                 Value<String?> grindSetting = const Value.absent(),
                 Value<double?> yieldG = const Value.absent(),
@@ -7610,6 +7750,7 @@ class $$EntriesTableTableManager
                 coffeeDoseG: coffeeDoseG,
                 waterTotalG: waterTotalG,
                 waterTempC: waterTempC,
+                waterCondition: waterCondition,
                 grinder: grinder,
                 grindSetting: grindSetting,
                 yieldG: yieldG,
@@ -7638,6 +7779,7 @@ class $$EntriesTableTableManager
                 required double coffeeDoseG,
                 required double waterTotalG,
                 Value<double?> waterTempC = const Value.absent(),
+                Value<String?> waterCondition = const Value.absent(),
                 Value<String?> grinder = const Value.absent(),
                 Value<String?> grindSetting = const Value.absent(),
                 Value<double?> yieldG = const Value.absent(),
@@ -7664,6 +7806,7 @@ class $$EntriesTableTableManager
                 coffeeDoseG: coffeeDoseG,
                 waterTotalG: waterTotalG,
                 waterTempC: waterTempC,
+                waterCondition: waterCondition,
                 grinder: grinder,
                 grindSetting: grindSetting,
                 yieldG: yieldG,

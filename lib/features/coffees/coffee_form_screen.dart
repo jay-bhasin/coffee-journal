@@ -23,9 +23,11 @@ class _CoffeeFormScreenState extends ConsumerState<CoffeeFormScreen> {
   final _varietalController = TextEditingController();
   final _processController = TextEditingController();
   final _tastingController = TextEditingController();
+  final _notesController = TextEditingController();
   final _tagsController = TextEditingController();
   final _altitudeController = TextEditingController();
   DateTime? _roastDate;
+  bool _isArchived = false;
 
   bool _loaded = false;
 
@@ -39,6 +41,7 @@ class _CoffeeFormScreenState extends ConsumerState<CoffeeFormScreen> {
     _varietalController.dispose();
     _processController.dispose();
     _tastingController.dispose();
+    _notesController.dispose();
     _tagsController.dispose();
     _altitudeController.dispose();
     super.dispose();
@@ -67,8 +70,10 @@ class _CoffeeFormScreenState extends ConsumerState<CoffeeFormScreen> {
             _varietalController.text = item.coffee.varietal ?? '';
             _processController.text = item.coffee.process ?? '';
             _tastingController.text = item.coffee.tastingNotes ?? '';
+            _notesController.text = item.coffee.notes ?? '';
             _altitudeController.text = item.coffee.altitudeM?.toString() ?? '';
             _roastDate = item.coffee.roastDate;
+            _isArchived = item.coffee.isArchived;
             _tagsController.text = item.tags.join(', ');
             _loaded = true;
           }
@@ -153,6 +158,18 @@ class _CoffeeFormScreenState extends ConsumerState<CoffeeFormScreen> {
                   decoration: const InputDecoration(labelText: 'Tasting notes'),
                 ),
                 TextFormField(
+                  controller: _notesController,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: const InputDecoration(labelText: 'Notes'),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Archived'),
+                  value: _isArchived,
+                  onChanged: (value) => setState(() => _isArchived = value),
+                ),
+                TextFormField(
                   controller: _tagsController,
                   decoration: const InputDecoration(labelText: 'Tags (comma-separated)'),
                 ),
@@ -175,7 +192,10 @@ class _CoffeeFormScreenState extends ConsumerState<CoffeeFormScreen> {
                       roastDate: _roastDate,
                       tastingNotes:
                           _tastingController.text.trim().isEmpty ? null : _tastingController.text.trim(),
+                      notes:
+                          _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
                       tags: _splitTags(_tagsController.text),
+                      isArchived: _isArchived,
                     );
                     if (context.mounted) context.pop();
                   },

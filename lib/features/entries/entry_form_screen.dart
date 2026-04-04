@@ -37,6 +37,7 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
   final _waterController = TextEditingController(text: '300');
   final _ratioController = TextEditingController(text: '15.0');
   final _tempController = TextEditingController(text: '94');
+  final _waterConditionController = TextEditingController();
   final _grinderController = TextEditingController();
   final _grindSettingController = TextEditingController();
   final _yieldController = TextEditingController();
@@ -91,6 +92,7 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
     _waterController.dispose();
     _ratioController.dispose();
     _tempController.dispose();
+    _waterConditionController.dispose();
     _grinderController.dispose();
     _grindSettingController.dispose();
     _yieldController.dispose();
@@ -171,6 +173,7 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
               _coffeeDoseController.text = entry.coffeeDoseG.toString();
               _waterController.text = entry.waterTotalG.toString();
               _tempController.text = entry.waterTempC?.toString() ?? '';
+              _waterConditionController.text = entry.waterCondition ?? '';
               _grinderController.text = entry.grinder ?? '';
               _grindSettingController.text = entry.grindSetting ?? '';
               _yieldController.text = entry.yieldG?.toString() ?? '';
@@ -228,6 +231,7 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
               _coffeeDoseController.text = template.defaultCoffeeDoseG?.toString() ?? '20';
               _waterController.text = template.defaultWaterTotalG?.toString() ?? '300';
               _tempController.text = '';
+              _waterConditionController.text = '';
               _grinderController.text = '';
               _grindSettingController.text = '';
               _yieldController.text = '';
@@ -451,6 +455,10 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
         controller: _tempController,
         decoration: const InputDecoration(labelText: 'Water temperature (C)'),
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      ),
+      TextFormField(
+        controller: _waterConditionController,
+        decoration: const InputDecoration(labelText: 'Water condition'),
       ),
       TextFormField(
         controller: _grinderController,
@@ -928,6 +936,7 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
       coffeeDoseG: double.parse(_coffeeDoseController.text),
       waterTotalG: double.parse(_waterController.text),
       waterTempC: double.tryParse(_tempController.text),
+      waterCondition: _clean(_waterConditionController.text),
       grinder: _clean(_grinderController.text),
       grindSetting: _clean(_grindSettingController.text),
       yieldG: double.tryParse(_yieldController.text),

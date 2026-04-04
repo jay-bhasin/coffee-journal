@@ -134,6 +134,7 @@ class LocalCoffeeRepository implements CoffeeRepository {
     String? altitudeM,
     DateTime? roastDate,
     String? tastingNotes,
+    String? notes,
     List<String> tags = const [],
     bool isArchived = false,
   }) async {
@@ -150,6 +151,7 @@ class LocalCoffeeRepository implements CoffeeRepository {
       varietal,
       process,
       tastingNotes,
+      notes,
       ...normalizedTags,
     ]);
 
@@ -173,6 +175,7 @@ class LocalCoffeeRepository implements CoffeeRepository {
             altitudeM: Value(altitudeM),
             roastDate: Value(roastDate),
             tastingNotes: Value(tastingNotes),
+            notes: Value(notes),
             isArchived: Value(isArchived),
             searchText: Value(mergedSearch),
             createdAt: Value(existing?.createdAt ?? now),
@@ -257,6 +260,7 @@ class LocalEntryRepository implements EntryRepository {
       coffeeDoseG: existing.entry.coffeeDoseG,
       waterTotalG: existing.entry.waterTotalG,
       waterTempC: existing.entry.waterTempC,
+      waterCondition: existing.entry.waterCondition,
       grinder: existing.entry.grinder,
       grindSetting: existing.entry.grindSetting,
       yieldG: existing.entry.yieldG,
@@ -369,6 +373,7 @@ class LocalEntryRepository implements EntryRepository {
     required double coffeeDoseG,
     required double waterTotalG,
     double? waterTempC,
+    String? waterCondition,
     String? grinder,
     String? grindSetting,
     double? yieldG,
@@ -393,6 +398,7 @@ class LocalEntryRepository implements EntryRepository {
 
     final searchText = _searchIndexer.buildIndex([
       brewMethod,
+      waterCondition,
       grinder,
       grindSetting,
       dialInNotes,
@@ -412,6 +418,7 @@ class LocalEntryRepository implements EntryRepository {
             coffeeDoseG: Value(coffeeDoseG),
             waterTotalG: Value(waterTotalG),
             waterTempC: Value(waterTempC),
+            waterCondition: Value(waterCondition),
             grinder: Value(grinder),
             grindSetting: Value(grindSetting),
             yieldG: Value(yieldG),
@@ -900,6 +907,7 @@ class LocalBackupRepository implements BackupRepository {
                 altitudeM: Value(_parseAltitude(map['altitudeM'])),
                 roastDate: Value(_parseDate(map['roastDate'])),
                 tastingNotes: Value(map['tastingNotes'] as String?),
+                notes: Value(map['notes'] as String?),
                 isArchived: Value(map['isArchived'] as bool? ?? false),
                 searchText: Value(map['searchText'] as String? ?? ''),
                 createdAt: Value(
@@ -929,6 +937,7 @@ class LocalBackupRepository implements BackupRepository {
                 coffeeDoseG: Value((map['coffeeDoseG'] as num).toDouble()),
                 waterTotalG: Value((map['waterTotalG'] as num).toDouble()),
                 waterTempC: Value((map['waterTempC'] as num?)?.toDouble()),
+                waterCondition: Value(map['waterCondition'] as String?),
                 grinder: Value(map['grinder'] as String?),
                 grindSetting: Value(map['grindSetting'] as String?),
                 yieldG: Value((map['yieldG'] as num?)?.toDouble()),
@@ -1198,6 +1207,7 @@ class LocalBackupRepository implements BackupRepository {
       'altitudeM': row.altitudeM,
       'roastDate': row.roastDate?.toIso8601String(),
       'tastingNotes': row.tastingNotes,
+      'notes': row.notes,
       'isArchived': row.isArchived,
       'searchText': row.searchText,
       'createdAt': row.createdAt.toIso8601String(),
@@ -1215,6 +1225,7 @@ class LocalBackupRepository implements BackupRepository {
       'coffeeDoseG': row.coffeeDoseG,
       'waterTotalG': row.waterTotalG,
       'waterTempC': row.waterTempC,
+      'waterCondition': row.waterCondition,
       'grinder': row.grinder,
       'grindSetting': row.grindSetting,
       'yieldG': row.yieldG,

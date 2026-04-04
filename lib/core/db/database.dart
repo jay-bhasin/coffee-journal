@@ -20,6 +20,7 @@ class Coffees extends Table {
   TextColumn get altitudeM => text().named('altitude_m').nullable()();
   DateTimeColumn get roastDate => dateTime().nullable()();
   TextColumn get tastingNotes => text().nullable()();
+  TextColumn get notes => text().nullable()();
   BoolColumn get isArchived => boolean().withDefault(const Constant(false))();
   TextColumn get searchText => text().withDefault(const Constant(''))();
   DateTimeColumn get createdAt => dateTime()();
@@ -40,6 +41,7 @@ class Entries extends Table {
   RealColumn get coffeeDoseG => real()();
   RealColumn get waterTotalG => real()();
   RealColumn get waterTempC => real().nullable()();
+  TextColumn get waterCondition => text().named('water_condition').nullable()();
   TextColumn get grinder => text().nullable()();
   TextColumn get grindSetting => text().nullable()();
 
@@ -203,7 +205,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -231,6 +233,12 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 3) {
             await _migrateCoffeeAltitudeToText();
+          }
+          if (from < 4) {
+            await customStatement('ALTER TABLE coffees ADD COLUMN notes TEXT;');
+            await customStatement(
+              'ALTER TABLE entries ADD COLUMN water_condition TEXT;',
+            );
           }
         },
       );
