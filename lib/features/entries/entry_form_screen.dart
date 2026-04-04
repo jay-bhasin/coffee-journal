@@ -5,6 +5,7 @@ import 'package:coffee_journal/core/models/enums.dart';
 import 'package:coffee_journal/core/models/recipe_step_draft.dart';
 import 'package:coffee_journal/core/models/sensory_notes.dart';
 import 'package:coffee_journal/core/repositories/contracts.dart';
+import 'package:coffee_journal/core/utils/recipe_scaler.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -112,503 +113,543 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
     final scaler = ref.watch(recipeScalerProvider);
     final brewTimeCalculator = ref.watch(brewTimeCalculatorProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.entryId == null ? 'New entry' : 'Edit entry'),
-        actions: [
-          IconButton(
-            tooltip: 'Save entry',
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(widget.entryId == null ? 'New entry' : 'Edit entry'),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Center(
+                child: FilledButton(
+                  onPressed: () async {
+                    final autoBrewTime =
+                        ref.read(brewTimeCalculatorProvider).calculateAutoBrewTimeSec(_steps);
+                    await _saveEntry(repository, autoBrewTime);
+                  },
+                  style: FilledButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                  ),
+                  child: const Text('Save'),
+                ),
+              ),
+            ),
+          ],
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'Recipe'),
+              Tab(text: 'Results'),
+            ],
+          ),
+        ),
+        body: FutureBuilder<_EntryFormSeed>(
+          future: _loadFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting &&
+                (widget.entryId != null ||
+                    widget.duplicateFromEntryId != null ||
+                    widget.templateId != null)) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            if (!_loaded && snapshot.data != null && snapshot.data!.entry != null) {
+              final EntryRecord item = snapshot.data!.entry!;
+              final entry = item.entry;
+              _brewAt = widget.entryId == null ? DateTime.now() : entry.brewAt;
+              _method = entry.brewMethod;
+              _isStarred = entry.isStarred;
+              _extractionOutcome = ExtractionOutcome.values.firstWhere(
+                (e) => e.name == entry.extractionOutcome,
+                orElse: () => ExtractionOutcome.unknown,
+              );
+              _coffeeDoseController.text = entry.coffeeDoseG.toString();
+              _waterController.text = entry.waterTotalG.toString();
+              _tempController.text = entry.waterTempC?.toString() ?? '';
+              _grinderController.text = entry.grinder ?? '';
+              _grindSettingController.text = entry.grindSetting ?? '';
+              _yieldController.text = entry.yieldG?.toString() ?? '';
+              _pressureController.text = entry.pressureBar?.toString() ?? '';
+              _preinfusionController.text = entry.preinfusionSec?.toString() ?? '';
+              _drawdownController.text = entry.drawdownSec?.toString() ?? '';
+              _agitationController.text = entry.agitationLevel ?? '';
+              _dialInController.text = entry.dialInNotes ?? '';
+              _miscController.text = entry.miscNotes ?? '';
+              _tagsController.text = item.tags.join(', ');
+              _brewTimeManual = entry.brewTimeSecManual;
+              _steps = item.steps
+                  .map<RecipeStepDraft>(
+                    (s) => RecipeStepDraft(
+                      type: RecipeStepType.values.firstWhere(
+                        (e) => e.name == s.type,
+                        orElse: () => RecipeStepType.custom,
+                      ),
+                      index: s.stepIndex,
+                      startSec: s.startSec,
+                      durationSec: s.durationSec,
+                      note: s.note,
+                      waterG: s.waterG,
+                      flowRateGPerSec: s.flowRateGPerSec,
+                      pressureBar: s.pressureBar,
+                      count: s.count,
+                      tool: s.tool,
+                      label: s.label,
+                      jsonPayload: s.jsonPayload,
+                    ),
+                  )
+                  .toList(growable: false);
+
+              if (entry.sensoryJson != null && entry.sensoryJson!.isNotEmpty) {
+                final sensory =
+                    SensoryNotes.fromJson(jsonDecode(entry.sensoryJson!) as Map<String, dynamic>);
+                _aromaController.text = sensory.aroma ?? '';
+                _flavorController.text = sensory.flavor ?? '';
+                _acidityController.text = sensory.acidity ?? '';
+                _sweetnessController.text = sensory.sweetness ?? '';
+                _bodyController.text = sensory.body ?? '';
+                _aftertasteController.text = sensory.aftertaste ?? '';
+                _sensoryFreeTextController.text = sensory.freeText ?? '';
+              }
+              _loaded = true;
+            }
+            if (!_loaded && snapshot.data != null && snapshot.data!.template != null) {
+              final TemplateRecord item = snapshot.data!.template!;
+              final template = item.template;
+              _brewAt = DateTime.now();
+              _method = template.brewMethod;
+              _isStarred = false;
+              _extractionOutcome = ExtractionOutcome.unknown;
+              _coffeeDoseController.text = template.defaultCoffeeDoseG?.toString() ?? '20';
+              _waterController.text = template.defaultWaterTotalG?.toString() ?? '300';
+              _tempController.text = '';
+              _grinderController.text = '';
+              _grindSettingController.text = '';
+              _yieldController.text = '';
+              _pressureController.text = '';
+              _preinfusionController.text = '';
+              _drawdownController.text = '';
+              _agitationController.text = '';
+              _dialInController.text = '';
+              _miscController.text = '';
+              _tagsController.text = item.tags.join(', ');
+              _brewTimeManual = null;
+              _steps = item.steps
+                  .map<RecipeStepDraft>(
+                    (s) => RecipeStepDraft(
+                      type: RecipeStepType.values.firstWhere(
+                        (e) => e.name == s.type,
+                        orElse: () => RecipeStepType.custom,
+                      ),
+                      index: s.stepIndex,
+                      startSec: s.startSec,
+                      durationSec: s.durationSec,
+                      note: s.note,
+                      waterG: s.waterG,
+                      flowRateGPerSec: s.flowRateGPerSec,
+                      pressureBar: s.pressureBar,
+                      count: s.count,
+                      tool: s.tool,
+                      label: s.label,
+                      jsonPayload: s.jsonPayload,
+                    ),
+                  )
+                  .toList(growable: false);
+              _aromaController.text = '';
+              _flavorController.text = '';
+              _acidityController.text = '';
+              _sweetnessController.text = '';
+              _bodyController.text = '';
+              _aftertasteController.text = '';
+              _sensoryFreeTextController.text = '';
+              _loaded = true;
+            }
+
+            final autoBrewTime = brewTimeCalculator.calculateAutoBrewTimeSec(_steps);
+            final bottomInset = MediaQuery.of(context).viewPadding.bottom;
+
+            return Form(
+              key: _formKey,
+              child: TabBarView(
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  _KeepAliveTab(
+                    child: ListView(
+                      key: const PageStorageKey('entry-form-recipe-tab'),
+                      padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomInset),
+                      children: _buildRecipeTab(
+                        context,
+                        scaler: scaler,
+                        autoBrewTime: autoBrewTime,
+                      ),
+                    ),
+                  ),
+                  _KeepAliveTab(
+                    child: ListView(
+                      key: const PageStorageKey('entry-form-results-tab'),
+                      padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomInset),
+                      children: _buildResultsTab(context),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildRecipeTab(
+    BuildContext context, {
+    required RecipeScaler scaler,
+    required int autoBrewTime,
+  }) {
+    return [
+      Row(
+        children: [
+          Expanded(
+            child: Text('Brewed at: ${_brewAt.toLocal().toString().split('.').first}'),
+          ),
+          TextButton(
             onPressed: () async {
-              final autoBrewTime =
-                  ref.read(brewTimeCalculatorProvider).calculateAutoBrewTimeSec(_steps);
-              await _saveEntry(repository, autoBrewTime);
+              final date = await showDatePicker(
+                context: context,
+                initialDate: _brewAt,
+                firstDate: DateTime(2000),
+                lastDate: DateTime(2100),
+              );
+              if (date != null && context.mounted) {
+                setState(() {
+                  _brewAt = DateTime(
+                    date.year,
+                    date.month,
+                    date.day,
+                    _brewAt.hour,
+                    _brewAt.minute,
+                  );
+                });
+              }
             },
-            icon: const Icon(Icons.save_outlined),
+            child: const Text('Change date'),
           ),
         ],
       ),
-      body: FutureBuilder<_EntryFormSeed>(
-        future: _loadFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting &&
-              (widget.entryId != null ||
-                  widget.duplicateFromEntryId != null ||
-                  widget.templateId != null)) {
-            return const Center(child: CircularProgressIndicator());
+      const SizedBox(height: 12),
+      FutureBuilder<List<BrewMethodOption>>(
+        future: ref.watch(brewMethodRepositoryProvider).list(),
+        builder: (context, methodSnapshot) {
+          final methods = methodSnapshot.data ?? const <BrewMethodOption>[];
+          if (methods.isNotEmpty && !methods.any((m) => m.name == _method)) {
+            _method = methods.first.name;
           }
-
-          if (!_loaded && snapshot.data != null && snapshot.data!.entry != null) {
-            final EntryRecord item = snapshot.data!.entry!;
-            final entry = item.entry;
-            _brewAt = widget.entryId == null ? DateTime.now() : entry.brewAt;
-            _method = entry.brewMethod;
-            _isStarred = entry.isStarred;
-            _extractionOutcome = ExtractionOutcome.values.firstWhere(
-              (e) => e.name == entry.extractionOutcome,
-              orElse: () => ExtractionOutcome.unknown,
-            );
-            _coffeeDoseController.text = entry.coffeeDoseG.toString();
-            _waterController.text = entry.waterTotalG.toString();
-            _tempController.text = entry.waterTempC?.toString() ?? '';
-            _grinderController.text = entry.grinder ?? '';
-            _grindSettingController.text = entry.grindSetting ?? '';
-            _yieldController.text = entry.yieldG?.toString() ?? '';
-            _pressureController.text = entry.pressureBar?.toString() ?? '';
-            _preinfusionController.text = entry.preinfusionSec?.toString() ?? '';
-            _drawdownController.text = entry.drawdownSec?.toString() ?? '';
-            _agitationController.text = entry.agitationLevel ?? '';
-            _dialInController.text = entry.dialInNotes ?? '';
-            _miscController.text = entry.miscNotes ?? '';
-            _tagsController.text = item.tags.join(', ');
-            _brewTimeManual = entry.brewTimeSecManual;
-            _steps = item.steps
-                .map<RecipeStepDraft>(
-                  (s) => RecipeStepDraft(
-                    type: RecipeStepType.values.firstWhere(
-                      (e) => e.name == s.type,
-                      orElse: () => RecipeStepType.custom,
-                    ),
-                    index: s.stepIndex,
-                    startSec: s.startSec,
-                    durationSec: s.durationSec,
-                    note: s.note,
-                    waterG: s.waterG,
-                    flowRateGPerSec: s.flowRateGPerSec,
-                    pressureBar: s.pressureBar,
-                    count: s.count,
-                    tool: s.tool,
-                    label: s.label,
-                    jsonPayload: s.jsonPayload,
-                  ),
-                )
-                .toList(growable: false);
-
-            if (entry.sensoryJson != null && entry.sensoryJson!.isNotEmpty) {
-              final sensory =
-                  SensoryNotes.fromJson(jsonDecode(entry.sensoryJson!) as Map<String, dynamic>);
-              _aromaController.text = sensory.aroma ?? '';
-              _flavorController.text = sensory.flavor ?? '';
-              _acidityController.text = sensory.acidity ?? '';
-              _sweetnessController.text = sensory.sweetness ?? '';
-              _bodyController.text = sensory.body ?? '';
-              _aftertasteController.text = sensory.aftertaste ?? '';
-              _sensoryFreeTextController.text = sensory.freeText ?? '';
-            }
-            _loaded = true;
-          }
-          if (!_loaded && snapshot.data != null && snapshot.data!.template != null) {
-            final TemplateRecord item = snapshot.data!.template!;
-            final template = item.template;
-            _brewAt = DateTime.now();
-            _method = template.brewMethod;
-            _isStarred = false;
-            _extractionOutcome = ExtractionOutcome.unknown;
-            _coffeeDoseController.text = template.defaultCoffeeDoseG?.toString() ?? '20';
-            _waterController.text = template.defaultWaterTotalG?.toString() ?? '300';
-            _tempController.text = '';
-            _grinderController.text = '';
-            _grindSettingController.text = '';
-            _yieldController.text = '';
-            _pressureController.text = '';
-            _preinfusionController.text = '';
-            _drawdownController.text = '';
-            _agitationController.text = '';
-            _dialInController.text = '';
-            _miscController.text = '';
-            _tagsController.text = item.tags.join(', ');
-            _brewTimeManual = null;
-            _steps = item.steps
-                .map<RecipeStepDraft>(
-                  (s) => RecipeStepDraft(
-                    type: RecipeStepType.values.firstWhere(
-                      (e) => e.name == s.type,
-                      orElse: () => RecipeStepType.custom,
-                    ),
-                    index: s.stepIndex,
-                    startSec: s.startSec,
-                    durationSec: s.durationSec,
-                    note: s.note,
-                    waterG: s.waterG,
-                    flowRateGPerSec: s.flowRateGPerSec,
-                    pressureBar: s.pressureBar,
-                    count: s.count,
-                    tool: s.tool,
-                    label: s.label,
-                    jsonPayload: s.jsonPayload,
-                  ),
-                )
-                .toList(growable: false);
-            _aromaController.text = '';
-            _flavorController.text = '';
-            _acidityController.text = '';
-            _sweetnessController.text = '';
-            _bodyController.text = '';
-            _aftertasteController.text = '';
-            _sensoryFreeTextController.text = '';
-            _loaded = true;
-          }
-
-          final autoBrewTime = brewTimeCalculator.calculateAutoBrewTimeSec(_steps);
-          final bottomInset = MediaQuery.of(context).viewPadding.bottom;
-
-          return Form(
-            key: _formKey,
-            child: ListView(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + bottomInset),
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text('Brewed at: ${_brewAt.toLocal().toString().split('.').first}'),
-                    ),
-                    TextButton(
-                      onPressed: () async {
-                        final date = await showDatePicker(
-                          context: context,
-                          initialDate: _brewAt,
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime(2100),
-                        );
-                        if (date != null && context.mounted) {
-                          setState(() {
-                            _brewAt = DateTime(
-                              date.year,
-                              date.month,
-                              date.day,
-                              _brewAt.hour,
-                              _brewAt.minute,
-                            );
-                          });
-                        }
-                      },
-                      child: const Text('Change date'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                FutureBuilder<List<BrewMethodOption>>(
-                  future: ref.watch(brewMethodRepositoryProvider).list(),
-                  builder: (context, methodSnapshot) {
-                    final methods = methodSnapshot.data ?? const <BrewMethodOption>[];
-                    if (methods.isNotEmpty && !methods.any((m) => m.name == _method)) {
-                      _method = methods.first.name;
-                    }
-                    return DropdownButtonFormField<String>(
-                      initialValue:
-                          methods.any((m) => m.name == _method) ? _method : (methods.isEmpty ? null : methods.first.name),
-                      decoration: const InputDecoration(labelText: 'Method'),
-                      items: methods
-                          .map((m) => DropdownMenuItem<String>(value: m.name, child: Text(m.name)))
-                          .toList(),
-                      onChanged: (value) => setState(() => _method = value ?? _method),
-                    );
-                  },
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Star entry'),
-                  value: _isStarred,
-                  onChanged: (v) => setState(() => _isStarred = v),
-                ),
-                TextFormField(
-                  controller: _coffeeDoseController,
-                  decoration: const InputDecoration(labelText: 'Coffee dose (g) *'),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  validator: (v) => (double.tryParse(v ?? '') ?? 0) <= 0 ? 'Must be > 0' : null,
-                  onChanged: (value) {
-                    if (!_ratioLocked) return;
-                    final newDose = double.tryParse(value);
-                    if (newDose == null || newDose <= 0) return;
-                    final currentRatio = scaler.computeRatio(
-                      coffeeDoseG: double.tryParse(_coffeeDoseController.text) ?? 0,
-                      waterTotalG: double.tryParse(_waterController.text) ?? 0,
-                    );
-                    final targetWater = scaler.counterpartForLockedRatio(
-                      changedValue: newDose,
-                      changedCoffeeDose: true,
-                      ratio: currentRatio,
-                    );
-                    final oldWater = double.tryParse(_waterController.text) ?? 0;
-                    setState(() {
-                      _waterController.text = targetWater.toStringAsFixed(1);
-                      _steps = scaler.redistributeWater(_steps, oldWater, targetWater);
-                    });
-                  },
-                ),
-                TextFormField(
-                  controller: _waterController,
-                  decoration: const InputDecoration(labelText: 'Water total (g) *'),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  validator: (v) => (double.tryParse(v ?? '') ?? 0) <= 0 ? 'Must be > 0' : null,
-                  onChanged: (value) {
-                    final newWater = double.tryParse(value);
-                    if (newWater == null || newWater <= 0) return;
-                    final oldWater = double.tryParse(_waterController.text) ?? 0;
-                    if (_ratioLocked) {
-                      final currentRatio = scaler.computeRatio(
-                        coffeeDoseG: double.tryParse(_coffeeDoseController.text) ?? 0,
-                        waterTotalG: oldWater,
-                      );
-                      final targetCoffee = scaler.counterpartForLockedRatio(
-                        changedValue: newWater,
-                        changedCoffeeDose: false,
-                        ratio: currentRatio,
-                      );
-                      _coffeeDoseController.text = targetCoffee.toStringAsFixed(1);
-                    }
-                    setState(() {
-                      _steps = scaler.redistributeWater(_steps, oldWater, newWater);
-                    });
-                  },
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Lock ratio'),
-                  subtitle: const Text('Changing coffee or water auto-updates the other field.'),
-                  value: _ratioLocked,
-                  onChanged: (v) => setState(() => _ratioLocked = v),
-                ),
-                ValueListenableBuilder<TextEditingValue>(
-                  valueListenable: _coffeeDoseController,
-                  builder: (context, coffeeValue, _) {
-                    return ValueListenableBuilder<TextEditingValue>(
-                      valueListenable: _waterController,
-                      builder: (context, waterValue, _) {
-                        final coffeeDose = double.tryParse(coffeeValue.text) ?? 0;
-                        final water = double.tryParse(waterValue.text) ?? 0;
-                        final ratio = scaler.computeRatio(
-                          coffeeDoseG: coffeeDose,
-                          waterTotalG: water,
-                        );
-                        return Text('Ratio: 1:${ratio.toStringAsFixed(1)}');
-                      },
-                    );
-                  },
-                ),
-                TextFormField(
-                  controller: _tempController,
-                  decoration: const InputDecoration(labelText: 'Water temperature (C)'),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                ),
-                TextFormField(
-                  controller: _grinderController,
-                  decoration: const InputDecoration(labelText: 'Grinder'),
-                ),
-                TextFormField(
-                  controller: _grindSettingController,
-                  decoration: const InputDecoration(labelText: 'Grind setting'),
-                ),
-                TextFormField(
-                  controller: _yieldController,
-                  decoration: const InputDecoration(labelText: 'Yield (g, optional)'),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                ),
-                TextFormField(
-                  controller: _pressureController,
-                  decoration: const InputDecoration(labelText: 'Pressure (bar, optional)'),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                ),
-                TextFormField(
-                  controller: _preinfusionController,
-                  decoration: const InputDecoration(labelText: 'Preinfusion (sec, optional)'),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Recipe steps (${_steps.length}) • Auto brew time: ${autoBrewTime}s',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    ),
-                    TextButton.icon(
-                      onPressed: () async {
-                        final step = await _showStepDialog(
-                          context,
-                          index: _steps.length,
-                        );
-                        if (step != null) {
-                          setState(() {
-                            _steps = [..._steps, step.copyWith(index: _steps.length)];
-                          });
-                        }
-                      },
-                      icon: const Icon(Icons.add),
-                      label: const Text('Step'),
-                    ),
-                  ],
-                ),
-                if (_steps.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8),
-                    child: Text('No recipe steps yet.'),
-                  )
-                else
-                  ReorderableListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _steps.length,
-                    onReorder: (oldIndex, newIndex) {
-                      setState(() {
-                        if (newIndex > oldIndex) newIndex -= 1;
-                        final step = _steps.removeAt(oldIndex);
-                        _steps.insert(newIndex, step);
-                        _steps = _steps
-                            .asMap()
-                            .entries
-                            .map((e) => e.value.copyWith(index: e.key))
-                            .toList(growable: false);
-                      });
-                    },
-                    itemBuilder: (context, index) {
-                      final step = _steps[index];
-                      return Card(
-                        key: ValueKey('step-${step.index}-${step.type.name}-$index'),
-                        child: IntrinsicHeight(
-                          child: Row(
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 8),
-                                child: _StepTimelineMarker(
-                                  isFirst: index == 0,
-                                  isLast: index == _steps.length - 1,
-                                  startSec: step.startSec,
-                                ),
-                              ),
-                              Expanded(
-                                child: ListTile(
-                                  title: Text('${index + 1}. ${step.type.name}'),
-                                  subtitle: Text(
-                                    [
-                                      if (step.waterG != null) '${step.waterG!.toStringAsFixed(1)}g water',
-                                      if (step.startSec != null) 'start ${step.startSec}s',
-                                      if (step.durationSec != null) 'dur ${step.durationSec}s',
-                                      if (step.pressureBar != null) '${step.pressureBar!.toStringAsFixed(1)}bar',
-                                      if (step.note != null) step.note,
-                                    ].join(' • '),
-                                  ),
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.edit_outlined),
-                                        onPressed: () async {
-                                          final edited = await _showStepDialog(
-                                            context,
-                                            initialStep: step,
-                                            index: index,
-                                          );
-                                          if (edited == null) return;
-                                          setState(() {
-                                            _steps[index] = edited.copyWith(index: index);
-                                          });
-                                        },
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.delete_outline),
-                                        onPressed: () {
-                                          setState(() {
-                                            _steps.removeAt(index);
-                                            _steps = _steps
-                                                .asMap()
-                                                .entries
-                                                .map((e) => e.value.copyWith(index: e.key))
-                                                .toList(growable: false);
-                                          });
-                                        },
-                                      ),
-                                      ReorderableDragStartListener(
-                                        index: index,
-                                        child: const Icon(Icons.drag_handle),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<ExtractionOutcome>(
-                  initialValue: _extractionOutcome,
-                  decoration: const InputDecoration(labelText: 'Extraction outcome'),
-                  items: ExtractionOutcome.values
-                      .map((e) => DropdownMenuItem(value: e, child: Text(e.name)))
-                      .toList(),
-                  onChanged: (v) => setState(() => _extractionOutcome = v ?? _extractionOutcome),
-                ),
-                TextFormField(
-                  controller: _drawdownController,
-                  decoration: const InputDecoration(labelText: 'Drawdown (sec)'),
-                  keyboardType: TextInputType.number,
-                ),
-                TextFormField(
-                  controller: _agitationController,
-                  decoration: const InputDecoration(labelText: 'Agitation level'),
-                ),
-                TextFormField(
-                  controller: _dialInController,
-                  minLines: 2,
-                  maxLines: 3,
-                  decoration: const InputDecoration(labelText: 'Dial-in notes'),
-                ),
-                TextFormField(
-                  controller: _miscController,
-                  minLines: 2,
-                  maxLines: 3,
-                  decoration: const InputDecoration(labelText: 'Misc notes'),
-                ),
-                TextFormField(
-                  controller: _tagsController,
-                  decoration: const InputDecoration(labelText: 'Tags (comma-separated)'),
-                ),
-                const Divider(height: 28),
-                Text('Sensory notes', style: Theme.of(context).textTheme.titleMedium),
-                TextFormField(
-                  controller: _aromaController,
-                  decoration: const InputDecoration(labelText: 'Aroma'),
-                ),
-                TextFormField(
-                  controller: _flavorController,
-                  decoration: const InputDecoration(labelText: 'Flavor'),
-                ),
-                TextFormField(
-                  controller: _acidityController,
-                  decoration: const InputDecoration(labelText: 'Acidity'),
-                ),
-                TextFormField(
-                  controller: _sweetnessController,
-                  decoration: const InputDecoration(labelText: 'Sweetness'),
-                ),
-                TextFormField(
-                  controller: _bodyController,
-                  decoration: const InputDecoration(labelText: 'Body'),
-                ),
-                TextFormField(
-                  controller: _aftertasteController,
-                  decoration: const InputDecoration(labelText: 'Aftertaste'),
-                ),
-                TextFormField(
-                  controller: _sensoryFreeTextController,
-                  minLines: 2,
-                  maxLines: 3,
-                  decoration: const InputDecoration(labelText: 'Sensory free notes'),
-                ),
-                const SizedBox(height: 24),
-                FilledButton(
-                  onPressed: () => _saveEntry(repository, autoBrewTime),
-                  child: const Text('Save entry'),
-                ),
-              ],
-            ),
+          return DropdownButtonFormField<String>(
+            initialValue: methods.any((m) => m.name == _method)
+                ? _method
+                : (methods.isEmpty ? null : methods.first.name),
+            decoration: const InputDecoration(labelText: 'Method'),
+            items: methods
+                .map((m) => DropdownMenuItem<String>(value: m.name, child: Text(m.name)))
+                .toList(),
+            onChanged: (value) => setState(() => _method = value ?? _method),
           );
         },
       ),
-    );
+      TextFormField(
+        controller: _coffeeDoseController,
+        decoration: const InputDecoration(labelText: 'Coffee dose (g) *'),
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        validator: (v) => (double.tryParse(v ?? '') ?? 0) <= 0 ? 'Must be > 0' : null,
+        onChanged: (value) {
+          if (!_ratioLocked) return;
+          final newDose = double.tryParse(value);
+          if (newDose == null || newDose <= 0) return;
+          final currentRatio = scaler.computeRatio(
+            coffeeDoseG: double.tryParse(_coffeeDoseController.text) ?? 0,
+            waterTotalG: double.tryParse(_waterController.text) ?? 0,
+          );
+          final targetWater = scaler.counterpartForLockedRatio(
+            changedValue: newDose,
+            changedCoffeeDose: true,
+            ratio: currentRatio,
+          );
+          final oldWater = double.tryParse(_waterController.text) ?? 0;
+          setState(() {
+            _waterController.text = targetWater.toStringAsFixed(1);
+            _steps = scaler.redistributeWater(_steps, oldWater, targetWater);
+          });
+        },
+      ),
+      TextFormField(
+        controller: _waterController,
+        decoration: const InputDecoration(labelText: 'Water total (g) *'),
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        validator: (v) => (double.tryParse(v ?? '') ?? 0) <= 0 ? 'Must be > 0' : null,
+        onChanged: (value) {
+          final newWater = double.tryParse(value);
+          if (newWater == null || newWater <= 0) return;
+          final oldWater = double.tryParse(_waterController.text) ?? 0;
+          if (_ratioLocked) {
+            final currentRatio = scaler.computeRatio(
+              coffeeDoseG: double.tryParse(_coffeeDoseController.text) ?? 0,
+              waterTotalG: oldWater,
+            );
+            final targetCoffee = scaler.counterpartForLockedRatio(
+              changedValue: newWater,
+              changedCoffeeDose: false,
+              ratio: currentRatio,
+            );
+            _coffeeDoseController.text = targetCoffee.toStringAsFixed(1);
+          }
+          setState(() {
+            _steps = scaler.redistributeWater(_steps, oldWater, newWater);
+          });
+        },
+      ),
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: const Text('Lock ratio'),
+        subtitle: const Text('Changing coffee or water auto-updates the other field.'),
+        value: _ratioLocked,
+        onChanged: (v) => setState(() => _ratioLocked = v),
+      ),
+      ValueListenableBuilder<TextEditingValue>(
+        valueListenable: _coffeeDoseController,
+        builder: (context, coffeeValue, _) {
+          return ValueListenableBuilder<TextEditingValue>(
+            valueListenable: _waterController,
+            builder: (context, waterValue, _) {
+              final coffeeDose = double.tryParse(coffeeValue.text) ?? 0;
+              final water = double.tryParse(waterValue.text) ?? 0;
+              final ratio = scaler.computeRatio(
+                coffeeDoseG: coffeeDose,
+                waterTotalG: water,
+              );
+              return Text('Ratio: 1:${ratio.toStringAsFixed(1)}');
+            },
+          );
+        },
+      ),
+      TextFormField(
+        controller: _tempController,
+        decoration: const InputDecoration(labelText: 'Water temperature (C)'),
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      ),
+      TextFormField(
+        controller: _grinderController,
+        decoration: const InputDecoration(labelText: 'Grinder'),
+      ),
+      TextFormField(
+        controller: _grindSettingController,
+        decoration: const InputDecoration(labelText: 'Grind setting'),
+      ),
+      TextFormField(
+        controller: _yieldController,
+        decoration: const InputDecoration(labelText: 'Yield (g, optional)'),
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      ),
+      TextFormField(
+        controller: _pressureController,
+        decoration: const InputDecoration(labelText: 'Pressure (bar, optional)'),
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      ),
+      TextFormField(
+        controller: _preinfusionController,
+        decoration: const InputDecoration(labelText: 'Preinfusion (sec, optional)'),
+        keyboardType: TextInputType.number,
+      ),
+      const SizedBox(height: 16),
+      Row(
+        children: [
+          Expanded(
+            child: Text(
+              'Recipe steps (${_steps.length}) • Auto brew time: ${autoBrewTime}s',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+          ),
+          TextButton.icon(
+            onPressed: () async {
+              final step = await _showStepDialog(
+                context,
+                index: _steps.length,
+              );
+              if (step != null) {
+                setState(() {
+                  _steps = [..._steps, step.copyWith(index: _steps.length)];
+                });
+              }
+            },
+            icon: const Icon(Icons.add),
+            label: const Text('Step'),
+          ),
+        ],
+      ),
+      if (_steps.isEmpty)
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: Text('No recipe steps yet.'),
+        )
+      else
+        ReorderableListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: _steps.length,
+          onReorder: (oldIndex, newIndex) {
+            setState(() {
+              if (newIndex > oldIndex) newIndex -= 1;
+              final step = _steps.removeAt(oldIndex);
+              _steps.insert(newIndex, step);
+              _steps = _steps
+                  .asMap()
+                  .entries
+                  .map((e) => e.value.copyWith(index: e.key))
+                  .toList(growable: false);
+            });
+          },
+          itemBuilder: (context, index) {
+            final step = _steps[index];
+            return Card(
+              key: ValueKey('step-${step.index}-${step.type.name}-$index'),
+              child: IntrinsicHeight(
+                child: Row(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: _StepTimelineMarker(
+                        isFirst: index == 0,
+                        isLast: index == _steps.length - 1,
+                        startSec: step.startSec,
+                      ),
+                    ),
+                    Expanded(
+                      child: ListTile(
+                        title: Text('${index + 1}. ${step.type.name}'),
+                        subtitle: Text(
+                          [
+                            if (step.waterG != null)
+                              '${step.waterG!.toStringAsFixed(1)}g water',
+                            if (step.startSec != null) 'start ${step.startSec}s',
+                            if (step.durationSec != null) 'dur ${step.durationSec}s',
+                            if (step.pressureBar != null)
+                              '${step.pressureBar!.toStringAsFixed(1)}bar',
+                            if (step.note != null) step.note,
+                          ].join(' • '),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined),
+                              onPressed: () async {
+                                final edited = await _showStepDialog(
+                                  context,
+                                  initialStep: step,
+                                  index: index,
+                                );
+                                if (edited == null) return;
+                                setState(() {
+                                  _steps[index] = edited.copyWith(index: index);
+                                });
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline),
+                              onPressed: () {
+                                setState(() {
+                                  _steps.removeAt(index);
+                                  _steps = _steps
+                                      .asMap()
+                                      .entries
+                                      .map((e) => e.value.copyWith(index: e.key))
+                                      .toList(growable: false);
+                                });
+                              },
+                            ),
+                            ReorderableDragStartListener(
+                              index: index,
+                              child: const Icon(Icons.drag_handle),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+    ];
+  }
+
+  List<Widget> _buildResultsTab(BuildContext context) {
+    return [
+      DropdownButtonFormField<ExtractionOutcome>(
+        initialValue: _extractionOutcome,
+        decoration: const InputDecoration(labelText: 'Extraction outcome'),
+        items: ExtractionOutcome.values
+            .map((e) => DropdownMenuItem(value: e, child: Text(e.name)))
+            .toList(),
+        onChanged: (v) => setState(() => _extractionOutcome = v ?? _extractionOutcome),
+      ),
+      TextFormField(
+        controller: _drawdownController,
+        decoration: const InputDecoration(labelText: 'Drawdown (sec)'),
+        keyboardType: TextInputType.number,
+      ),
+      TextFormField(
+        controller: _agitationController,
+        decoration: const InputDecoration(labelText: 'Agitation level'),
+      ),
+      TextFormField(
+        controller: _dialInController,
+        minLines: 2,
+        maxLines: 3,
+        decoration: const InputDecoration(labelText: 'Dial-in notes'),
+      ),
+      TextFormField(
+        controller: _miscController,
+        minLines: 2,
+        maxLines: 3,
+        decoration: const InputDecoration(labelText: 'Misc notes'),
+      ),
+      TextFormField(
+        controller: _tagsController,
+        decoration: const InputDecoration(labelText: 'Tags (comma-separated)'),
+      ),
+      const Divider(height: 28),
+      Text('Sensory notes', style: Theme.of(context).textTheme.titleMedium),
+      TextFormField(
+        controller: _aromaController,
+        decoration: const InputDecoration(labelText: 'Aroma'),
+      ),
+      TextFormField(
+        controller: _flavorController,
+        decoration: const InputDecoration(labelText: 'Flavor'),
+      ),
+      TextFormField(
+        controller: _acidityController,
+        decoration: const InputDecoration(labelText: 'Acidity'),
+      ),
+      TextFormField(
+        controller: _sweetnessController,
+        decoration: const InputDecoration(labelText: 'Sweetness'),
+      ),
+      TextFormField(
+        controller: _bodyController,
+        decoration: const InputDecoration(labelText: 'Body'),
+      ),
+      TextFormField(
+        controller: _aftertasteController,
+        decoration: const InputDecoration(labelText: 'Aftertaste'),
+      ),
+      TextFormField(
+        controller: _sensoryFreeTextController,
+        minLines: 2,
+        maxLines: 3,
+        decoration: const InputDecoration(labelText: 'Sensory free notes'),
+      ),
+    ];
   }
 
   Future<RecipeStepDraft?> _showStepDialog(
@@ -772,6 +813,27 @@ class _EntryFormSeed {
 
   final EntryRecord? entry;
   final TemplateRecord? template;
+}
+
+class _KeepAliveTab extends StatefulWidget {
+  const _KeepAliveTab({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_KeepAliveTab> createState() => _KeepAliveTabState();
+}
+
+class _KeepAliveTabState extends State<_KeepAliveTab>
+    with AutomaticKeepAliveClientMixin<_KeepAliveTab> {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
 }
 
 class _StepTimelineMarker extends StatelessWidget {
