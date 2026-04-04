@@ -129,13 +129,37 @@ Backup/import UI is in dedicated `BackupScreen`.
 ## Entry Editing/Display Behavior
 ### Entry form
 - Cached loading future to prevent focus loss while typing.
-- Save via app-bar icon and bottom button share one save handler.
+- Two-tab form with fixed `TabBar`:
+  - `Recipe`
+  - `Results`
+- Save is app-bar only via filled `Save` button.
 - Recipe steps support add/edit/delete/reorder.
-- Timeline marker shown next to steps.
 - Supports seed loading from:
   - Existing entry (edit)
   - Duplicate source entry
   - Template (`templateId` query param)
+- Brew timestamp picker edits both date and time.
+- Dose / water / ratio now use a tri-lock model:
+  - exactly one of `dose`, `water`, or `ratio` is locked at a time
+  - locked field is read-only
+  - editing either unlocked field recalculates the locked one
+  - default lock is `ratio`
+- Ratio is now an editable field with fixed `1:` prefix.
+- The old boolean `Lock ratio` switch is removed.
+- Dose/water/ratio edits do not automatically rescale recipe steps.
+- Manual recipe rescaling is available via `Readjust recipe to totals` filled button.
+  - uses proportional redistribution of existing water-bearing steps
+  - shows snackbar feedback on success/no-op/error state
+- Below the recipe-step list, the form shows a recipe-water summary:
+  - summed water from recipe steps
+  - mismatch vs top-level water total when outside rounding tolerance
+  - styled with `Icons.water_drop_outlined`
+- Recipe step editing is duration-only:
+  - `startSec` is derived from cumulative prior durations
+  - `Start (sec)` is no longer editable
+- Custom steps can now edit `label` in the step dialog.
+- Custom-step labels are shown as the primary step title when present.
+- Entry-level tags have been removed from the app-facing journal-entry UI and repository contracts.
 
 ### Entry list
 - Filters/sort panel toggled from app bar.
@@ -145,8 +169,9 @@ Backup/import UI is in dedicated `BackupScreen`.
   - Brew method shown as chip
   - Other metadata as regular text
   - Grinder format: `GrindSize (Grinder)`
+- Entry card actions:
+  - Star/Unstar via leading star icon
 - Entry menu actions:
-  - Star/Unstar
   - Duplicate as today
   - Edit
   - Create template from entry
@@ -156,19 +181,26 @@ Backup/import UI is in dedicated `BackupScreen`.
 - Same menu actions as entry list.
 - Top of page uses the same shared coffee summary card as entry list.
 - Detail content is now sectioned into:
-  - heading row with brew date/time and brew method chip
+  - heading row with brew date/time
   - extraction outcome and starred chips
   - recipe details grid
   - recipe steps timeline
   - results grid
   - sensory grid
-- Star indicator in app bar when starred.
+- Star/unstar is available directly in the app bar icon.
 - Timeline-style recipe list with final `End` tile.
 - `Start`/`Dur` removed from step subtitle.
 - Hides empty fields.
 - Suppresses extraction outcome when `unknown`.
 - Template-name prompt uses controller-free dialog input to avoid disposed-controller crashes
 - Espresso-specific values (`yield`, `pressure`, `preinfusion`) appear in the recipe details grid when present
+- Recipe steps are rendered from normalized/derived start times via shared step conversion logic.
+- Final `End` tile only appears when the last step has nonzero duration.
+- Recipe-step header includes a segmented water-display toggle:
+  - `Σ` = cumulative water
+  - `Δ` = per-step water
+  - default is cumulative
+- The `Σ / Δ` toggle state is isolated to a dedicated stateful recipe-step section so the full page does not scroll back to top on toggle.
 
 ## Formatting Rules (Current)
 Applied in entry list/detail:
@@ -230,6 +262,7 @@ lib/
     utils/
       brew_time_calculator.dart
       display_formatters.dart
+      recipe_timeline.dart
       recipe_scaler.dart
       unit_converter.dart
   features/
