@@ -216,10 +216,10 @@ class _TemplateFormScreenState extends ConsumerState<TemplateFormScreen> {
                         scaler: scaler,
                       ),
                     ),
-                    TextFormField(
-                      controller: _tagsController,
-                      decoration: const InputDecoration(labelText: 'Tags (comma-separated)'),
-                    ),
+                    // TextFormField(
+                    //   controller: _tagsController,
+                    //   decoration: const InputDecoration(labelText: 'Tags (comma-separated)'),
+                    // ),
                     const SizedBox(height: 8),
                     Align(
                       alignment: Alignment.centerLeft,

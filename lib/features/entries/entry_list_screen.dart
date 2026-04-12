@@ -57,7 +57,7 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
           if (action == 'blank') {
             await context.push('/coffee/${widget.coffeeId}/entry/new');
           } else if (action == 'template') {
-            final templateId = await _selectTemplateId(context, templateRepository);
+            final templateId = await context.push<String>('/templates?picker=1');
             if (!context.mounted || templateId == null) return;
             await context.push('/coffee/${widget.coffeeId}/entry/new?templateId=$templateId');
           }
@@ -442,47 +442,6 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                 onTap: () => Navigator.of(context).pop('template'),
               ),
             ],
-          ),
-        );
-      },
-    );
-  }
-
-  Future<String?> _selectTemplateId(
-    BuildContext context,
-    TemplateRepository repository,
-  ) async {
-    final templates = await repository.list();
-    if (templates.isEmpty) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No templates found. Create one from Settings > Recipe templates.')),
-        );
-      }
-      return null;
-    }
-    if (!context.mounted) return null;
-
-    return showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) {
-        return SafeArea(
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: templates.length,
-            itemBuilder: (context, index) {
-              final record = templates[index];
-              final template = record.template;
-              final dose = template.defaultCoffeeDoseG?.toStringAsFixed(1) ?? '-';
-              final water = template.defaultWaterTotalG?.toStringAsFixed(1) ?? '-';
-              return ListTile(
-                leading: const Icon(Icons.description_outlined),
-                title: Text(template.name),
-                subtitle: Text('${template.brewMethod} • $dose g / $water g • ${record.steps.length} steps'),
-                onTap: () => Navigator.of(context).pop(template.id),
-              );
-            },
           ),
         );
       },

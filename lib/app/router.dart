@@ -57,7 +57,9 @@ final appRouter = GoRouter(
         ),
         GoRoute(
           path: 'templates',
-          builder: (context, state) => const TemplatesScreen(),
+          builder: (context, state) => TemplatesScreen(
+            isPickerMode: state.uri.queryParameters['picker'] == '1',
+          ),
           routes: [
             GoRoute(
               path: 'new',
