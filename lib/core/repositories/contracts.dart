@@ -51,7 +51,11 @@ class EntryFilter {
 }
 
 abstract class CoffeeRepository {
-  Future<List<CoffeeRecord>> list({String query, CoffeeSortOption sort});
+  Future<List<CoffeeRecord>> list({
+    String query,
+    CoffeeSortOption sort,
+    bool? isArchived,
+  });
 
   Future<CoffeeRecord?> getById(String id);
 
@@ -176,8 +180,10 @@ class ImportPreview {
 }
 
 abstract class SettingsRepository {
-  Future<UnitSystem> getUnitSystem();
-  Future<void> setUnitSystem(UnitSystem unitSystem);
+  Future<WeightUnitSystem> getWeightUnitSystem();
+  Future<void> setWeightUnitSystem(WeightUnitSystem unitSystem);
+  Future<TemperatureUnitSystem> getTemperatureUnitSystem();
+  Future<void> setTemperatureUnitSystem(TemperatureUnitSystem unitSystem);
   Future<bool> getDarkModeEnabled();
   Future<void> setDarkModeEnabled(bool enabled);
 }

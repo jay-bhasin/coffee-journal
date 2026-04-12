@@ -25,7 +25,9 @@ enum RecipeStepType {
 
 enum ExtractionOutcome {
   under,
+  slightUnder,
   exact,
+  slightOver,
   over,
   unknown,
 }
@@ -38,6 +40,16 @@ enum TemplateScope {
 enum UnitSystem {
   metric,
   imperial,
+}
+
+enum WeightUnitSystem {
+  grams,
+  ounces,
+}
+
+enum TemperatureUnitSystem {
+  celsius,
+  fahrenheit,
 }
 
 enum CoffeeSortOption {

@@ -118,6 +118,7 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
     final repository = ref.watch(entryRepositoryProvider);
     final scaler = ref.watch(recipeScalerProvider);
     final brewTimeCalculator = ref.watch(brewTimeCalculatorProvider);
+    final displayFormatter = ref.watch(appDisplayFormatterProvider);
 
     return DefaultTabController(
       length: 2,
@@ -291,6 +292,7 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
                         context,
                         scaler: scaler,
                         autoBrewTime: autoBrewTime,
+                        displayFormatter: displayFormatter,
                       ),
                     ),
                   ),
@@ -314,6 +316,7 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
     BuildContext context, {
     required RecipeScaler scaler,
     required int autoBrewTime,
+    required AppDisplayFormatter displayFormatter,
   }) {
     return [
       Row(
@@ -564,7 +567,7 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
                                 [
                                   if (step.durationSec != null) '${step.durationSec} s',
                                   if (step.waterG != null)
-                                    DisplayFormatters.formatWeight(step.waterG),
+                                    displayFormatter.formatWeight(step.waterG),
                                   if (step.pressureBar != null)
                                     '${step.pressureBar!.toStringAsFixed(1)} bar',
                                   if (step.note != null) step.note,
@@ -621,11 +624,11 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
                     const SizedBox(width: 8),
                     Text(
                       targetWater == null
-                          ? DisplayFormatters.formatWeight(recipeWaterTotal)
+                          ? displayFormatter.formatWeight(recipeWaterTotal)
                           : withinRoundingError
-                              ? DisplayFormatters.formatWeight(recipeWaterTotal)
-                              : '${DisplayFormatters.formatWeight(recipeWaterTotal)} '
-                                  '(${difference! > 0 ? '+' : ''}${DisplayFormatters.formatWeight(difference)})',
+                              ? displayFormatter.formatWeight(recipeWaterTotal)
+                              : '${displayFormatter.formatWeight(recipeWaterTotal)} '
+                                  '(${difference! > 0 ? '+' : ''}${displayFormatter.formatWeight(difference)})',
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                             color: withinRoundingError || targetWater == null
                                 ? Theme.of(context).colorScheme.onSurfaceVariant
@@ -749,7 +752,12 @@ class _EntryFormScreenState extends ConsumerState<EntryFormScreen> {
         initialValue: _extractionOutcome,
         decoration: const InputDecoration(labelText: 'Extraction outcome'),
         items: ExtractionOutcome.values
-            .map((e) => DropdownMenuItem(value: e, child: Text(e.name)))
+            .map(
+              (e) => DropdownMenuItem(
+                value: e,
+                child: DisplayFormatters.extractionOutcomeOption(e.name),
+              ),
+            )
             .toList(),
         onChanged: (v) => setState(() => _extractionOutcome = v ?? _extractionOutcome),
       ),

@@ -19,6 +19,7 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
   final FocusNode _searchFocusNode = FocusNode();
   CoffeeSortOption _sort = CoffeeSortOption.updatedAt;
   bool _showSearch = false;
+  bool _showArchived = false;
   late Future<_HomeData> _homeDataFuture;
 
   @override
@@ -38,67 +39,108 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
   Widget build(BuildContext context) {
     final repository = ref.watch(coffeeRepositoryProvider);
 
-    return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          await context.push('/coffee/new');
-          _refreshHomeData();
-        },
-        icon: const Icon(Icons.add, size: 20),
-        label: const Text('Add coffee'),
-      ),
-      body: FutureBuilder<_HomeData>(
-        future: _homeDataFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting &&
-              !snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
+    return DefaultTabController(
+      length: 2,
+      initialIndex: _showArchived ? 1 : 0,
+      child: Scaffold(
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () async {
+            await context.push('/coffee/new');
+            _refreshHomeData();
+          },
+          icon: const Icon(Icons.add, size: 20),
+          label: const Text('Add coffee'),
+        ),
+        body: FutureBuilder<_HomeData>(
+          future: _homeDataFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting &&
+                !snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-          final data = snapshot.data;
-          if (data == null) {
-            return const Center(child: Text('Unable to load coffees'));
-          }
+            final data = snapshot.data;
+            if (data == null) {
+              return const Center(child: Text('Unable to load coffees'));
+            }
 
-          final coffees = data.coffees;
+            final coffees = data.coffees;
 
-          return CustomScrollView(
-            slivers: [
-              SliverAppBar(
-                pinned: true,
-                titleSpacing: _showSearch ? 8 : NavigationToolbar.kMiddleSpacing,
-                title: _showSearch
-                    ? _AppBarSearchField(
-                        controller: _searchController,
-                        focusNode: _searchFocusNode,
-                        onChanged: (_) => _refreshHomeData(),
-                        onClear: () {
-                          _searchController.clear();
-                          _refreshHomeData();
-                        },
+            return CustomScrollView(
+              slivers: [
+                SliverAppBar(
+                  pinned: true,
+                  toolbarHeight: _showSearch ? 72 : kToolbarHeight,
+                  titleSpacing: _showSearch ? 12 : NavigationToolbar.kMiddleSpacing,
+                  title: _showSearch
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: _AppBarSearchField(
+                            controller: _searchController,
+                            focusNode: _searchFocusNode,
+                            onChanged: (_) => _refreshHomeData(),
+                            onClear: () {
+                              _searchController.clear();
+                              _refreshHomeData();
+                            },
+                          ),
+                        )
+                      : const Text('Coffee Journal'),
+                  actions: [
+                    if (_showSearch)
+                      IconButton(
+                        tooltip: 'Close search',
+                        onPressed: _closeSearch,
+                        icon: const Icon(Icons.close),
                       )
-                    : const Text('Coffee Journal'),
-                actions: [
-                  if (_showSearch)
-                    IconButton(
-                      tooltip: 'Close search',
-                      onPressed: _closeSearch,
-                      icon: const Icon(Icons.close),
-                    )
-                  else ...[
-                    IconButton(
-                      tooltip: 'Search',
-                      onPressed: _openSearch,
-                      icon: const Icon(Icons.search),
-                    ),
-                    IconButton(
-                      tooltip: 'Settings',
-                      onPressed: () => context.push('/settings'),
-                      icon: const Icon(Icons.settings),
-                    ),
+                    else ...[
+                      IconButton(
+                        tooltip: 'Search',
+                        onPressed: _openSearch,
+                        icon: const Icon(Icons.search),
+                      ),
+                      IconButton(
+                        tooltip: 'Settings',
+                        onPressed: () => context.push('/settings'),
+                        icon: const Icon(Icons.settings),
+                      ),
+                    ],
                   ],
-                ],
-              ),
+                  bottom: PreferredSize(
+                    preferredSize: const Size.fromHeight(56),
+                    child: TabBar(
+                      labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+                      onTap: (index) {
+                        final showArchived = index == 1;
+                        if (showArchived == _showArchived) return;
+                        setState(() => _showArchived = showArchived);
+                        _refreshHomeData();
+                      },
+                      tabs: const [
+                        Tab(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.coffee_outlined, size: 18),
+                              SizedBox(width: 8),
+                              Text('Now Brewing'),
+                            ],
+                          ),
+                        ),
+                        Tab(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.archive_outlined, size: 18),
+                              SizedBox(width: 8),
+                              Text('Archived'),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -132,7 +174,7 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
                       Row(
                         children: [
                           Text(
-                            'All Coffees (${coffees.length})',
+                            '${_showArchived ? 'Archived' : 'Now Brewing'} (${coffees.length})',
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           const Spacer(),
@@ -195,13 +237,14 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
               if (coffees.isEmpty)
                 SliverFillRemaining(
                   hasScrollBody: false,
-                  child: _EmptyState(
-                    hasQuery: _searchController.text.trim().isNotEmpty,
-                    onAddCoffee: () async {
-                      await context.push('/coffee/new');
-                      _refreshHomeData();
-                    },
-                  ),
+                        child: _EmptyState(
+                          hasQuery: _searchController.text.trim().isNotEmpty,
+                          archiveLabel: _showArchived ? 'archived coffees' : 'current coffees',
+                          onAddCoffee: () async {
+                            await context.push('/coffee/new');
+                            _refreshHomeData();
+                          },
+                        ),
                 )
               else
                 SliverPadding(
@@ -224,6 +267,26 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
                             );
                             _refreshHomeData();
                           },
+                          onToggleArchived: () async {
+                            await repository.upsert(
+                              id: item.coffee.id,
+                              name: item.coffee.name,
+                              roaster: item.coffee.roaster,
+                              country: item.coffee.country,
+                              region: item.coffee.region,
+                              farm: item.coffee.farm,
+                              producer: item.coffee.producer,
+                              varietal: item.coffee.varietal,
+                              process: item.coffee.process,
+                              altitudeM: item.coffee.altitudeM,
+                              roastDate: item.coffee.roastDate,
+                              tastingNotes: item.coffee.tastingNotes,
+                              notes: item.coffee.notes,
+                              tags: item.tags,
+                              isArchived: !item.coffee.isArchived,
+                            );
+                            _refreshHomeData();
+                          },
                           onDelete: () async {
                             await repository.delete(item.coffee.id);
                             _refreshHomeData();
@@ -233,9 +296,10 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
                     },
                   ),
                 ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -280,6 +344,7 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen> {
     final coffees = await repository.list(
       query: _searchController.text,
       sort: _sort,
+      isArchived: _showArchived,
     );
     final allCoffees = await db.select(db.coffees).get();
     final allEntries = await db.select(db.entries).get();
@@ -387,7 +452,7 @@ class _AppBarSearchField extends StatelessWidget {
         color: Theme.of(context).colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(16),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       child: TextField(
         controller: controller,
         focusNode: focusNode,
@@ -397,7 +462,7 @@ class _AppBarSearchField extends StatelessWidget {
           hintText: 'Search name, roaster, origin, tags',
           isDense: true,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+          contentPadding: const EdgeInsets.symmetric(vertical: 14),
           suffixIcon: controller.text.trim().isNotEmpty
               ? IconButton(
                   tooltip: 'Clear search',
@@ -417,12 +482,14 @@ class _CoffeeCard extends StatelessWidget {
     required this.item,
     required this.onTap,
     required this.onEdit,
+    required this.onToggleArchived,
     required this.onDelete,
   });
 
   final CoffeeRecord item;
   final VoidCallback onTap;
   final Future<void> Function() onEdit;
+  final Future<void> Function() onToggleArchived;
   final Future<void> Function() onDelete;
 
   @override
@@ -478,13 +545,20 @@ class _CoffeeCard extends StatelessWidget {
                       if (v == 'edit') {
                         await onEdit();
                       }
+                      if (v == 'archive') {
+                        await onToggleArchived();
+                      }
                       if (v == 'delete') {
                         await onDelete();
                       }
                     },
-                    itemBuilder: (context) => const [
-                      PopupMenuItem(value: 'edit', child: Text('Edit')),
-                      PopupMenuItem(value: 'delete', child: Text('Delete')),
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                      PopupMenuItem(
+                        value: 'archive',
+                        child: Text(item.coffee.isArchived ? 'Unarchive' : 'Archive'),
+                      ),
+                      const PopupMenuItem(value: 'delete', child: Text('Delete')),
                     ],
                   ),
                 ],
@@ -545,9 +619,14 @@ class _CoffeeCard extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.hasQuery, required this.onAddCoffee});
+  const _EmptyState({
+    required this.hasQuery,
+    required this.archiveLabel,
+    required this.onAddCoffee,
+  });
 
   final bool hasQuery;
+  final String archiveLabel;
   final Future<void> Function() onAddCoffee;
 
   @override
@@ -569,28 +648,39 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              hasQuery ? 'No matching coffees' : 'No coffees yet',
+              hasQuery ? 'No matching coffees' : 'No $archiveLabel yet',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 6),
             Text(
               hasQuery
                   ? 'Try a different search term or clear search.'
-                  : 'Add your first coffee to start logging brews.',
+                  : _archiveLabelMessage(),
               style: Theme.of(context).textTheme.bodyMedium,
               textAlign: TextAlign.center,
             ),
             if (!hasQuery) ...[
               const SizedBox(height: 16),
               FilledButton.icon(
-                onPressed: onAddCoffee,
+                onPressed: archiveLabel == 'current coffees' ? onAddCoffee : null,
                 icon: const Icon(Icons.add),
-                label: const Text('Add first coffee'),
+                label: Text(
+                  archiveLabel == 'current coffees'
+                      ? 'Add first coffee'
+                      : 'Add coffee in Now Brewing',
+                ),
               ),
             ],
           ],
         ),
       ),
     );
+  }
+
+  String _archiveLabelMessage() {
+    if (archiveLabel == 'archived coffees') {
+      return 'Archived coffees will appear here when you move them out of Now Brewing.';
+    }
+    return 'Add your first coffee to start logging brews.';
   }
 }

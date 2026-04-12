@@ -163,12 +163,6 @@ class _CoffeeFormScreenState extends ConsumerState<CoffeeFormScreen> {
                   maxLines: 4,
                   decoration: const InputDecoration(labelText: 'Notes'),
                 ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Archived'),
-                  value: _isArchived,
-                  onChanged: (value) => setState(() => _isArchived = value),
-                ),
                 TextFormField(
                   controller: _tagsController,
                   decoration: const InputDecoration(labelText: 'Tags (comma-separated)'),

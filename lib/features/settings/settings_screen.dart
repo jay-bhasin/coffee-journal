@@ -12,7 +12,8 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  UnitSystem _unitSystem = UnitSystem.metric;
+  WeightUnitSystem _weightUnitSystem = WeightUnitSystem.grams;
+  TemperatureUnitSystem _temperatureUnitSystem = TemperatureUnitSystem.celsius;
   bool _loaded = false;
 
   @override
@@ -22,31 +23,68 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
-      body: FutureBuilder<UnitSystem>(
-        future: settingsRepo.getUnitSystem(),
+      body: FutureBuilder<({WeightUnitSystem weight, TemperatureUnitSystem temperature})>(
+        future: () async {
+          final weight = await settingsRepo.getWeightUnitSystem();
+          final temperature = await settingsRepo.getTemperatureUnitSystem();
+          return (weight: weight, temperature: temperature);
+        }(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting && !_loaded) {
             return const Center(child: CircularProgressIndicator());
           }
 
           if (!_loaded) {
-            _unitSystem = snapshot.data ?? UnitSystem.metric;
+            final data = snapshot.data;
+            _weightUnitSystem = data?.weight ?? WeightUnitSystem.grams;
+            _temperatureUnitSystem =
+                data?.temperature ?? TemperatureUnitSystem.celsius;
             _loaded = true;
           }
 
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              Text('Units', style: Theme.of(context).textTheme.titleMedium),
-              SegmentedButton<UnitSystem>(
+              Text('Weight units', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              SegmentedButton<WeightUnitSystem>(
                 segments: const [
-                  ButtonSegment(value: UnitSystem.metric, label: Text('Metric')),
-                  ButtonSegment(value: UnitSystem.imperial, label: Text('Imperial')),
+                  ButtonSegment(value: WeightUnitSystem.grams, label: Text('g')),
+                  ButtonSegment(value: WeightUnitSystem.ounces, label: Text('oz')),
                 ],
-                selected: {_unitSystem},
+                selected: {_weightUnitSystem},
                 onSelectionChanged: (selection) async {
-                  setState(() => _unitSystem = selection.first);
-                  await settingsRepo.setUnitSystem(_unitSystem);
+                  setState(() => _weightUnitSystem = selection.first);
+                  await settingsRepo.setWeightUnitSystem(_weightUnitSystem);
+                  ref.invalidate(weightUnitSystemProvider);
+                  ref.invalidate(appDisplayFormatterProvider);
+                },
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Temperature units',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              SegmentedButton<TemperatureUnitSystem>(
+                segments: const [
+                  ButtonSegment(
+                    value: TemperatureUnitSystem.celsius,
+                    label: Text('°C'),
+                  ),
+                  ButtonSegment(
+                    value: TemperatureUnitSystem.fahrenheit,
+                    label: Text('°F'),
+                  ),
+                ],
+                selected: {_temperatureUnitSystem},
+                onSelectionChanged: (selection) async {
+                  setState(() => _temperatureUnitSystem = selection.first);
+                  await settingsRepo.setTemperatureUnitSystem(
+                    _temperatureUnitSystem,
+                  );
+                  ref.invalidate(temperatureUnitSystemProvider);
+                  ref.invalidate(appDisplayFormatterProvider);
                 },
               ),
               const Divider(height: 32),

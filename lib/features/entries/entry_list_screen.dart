@@ -30,11 +30,7 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
     final templateRepository = ref.watch(templateRepositoryProvider);
     final scaler = ref.watch(recipeScalerProvider);
     final brewMethodsRepo = ref.watch(brewMethodRepositoryProvider);
-    final unitSystem = ref.watch(unitSystemProvider).maybeWhen(
-          data: (value) => value,
-          orElse: () => UnitSystem.metric,
-        );
-    final unitConverter = ref.watch(unitConverterProvider);
+    final displayFormatter = ref.watch(appDisplayFormatterProvider);
     final coffeeFuture = coffeeRepository.getById(widget.coffeeId);
 
     return Scaffold(
@@ -221,11 +217,7 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                         waterTotalG: entry.waterTotalG,
                       );
                       final brewTime = entry.brewTimeSecManual ?? entry.brewTimeSecAuto;
-                      final tempLabel = DisplayFormatters.formatTemperature(
-                        entry.waterTempC,
-                        unitSystem,
-                        unitConverter,
-                      );
+                      final tempLabel = displayFormatter.formatTemperature(entry.waterTempC);
                       final grinderLabel = DisplayFormatters.formatGrinder(
                         entry.grinder,
                         entry.grindSetting,
@@ -256,8 +248,8 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    '${DisplayFormatters.formatWeight(entry.coffeeDoseG)} / '
-                                    '${DisplayFormatters.formatWeight(entry.waterTotalG)} '
+                                    '${displayFormatter.formatWeight(entry.coffeeDoseG)} / '
+                                    '${displayFormatter.formatWeight(entry.waterTotalG)} '
                                     '(1:${ratio.toStringAsFixed(1)})',
                                   ),
                                   Text(

@@ -40,10 +40,14 @@ class LocalCoffeeRepository implements CoffeeRepository {
   Future<List<CoffeeRecord>> list({
     String query = '',
     CoffeeSortOption sort = CoffeeSortOption.updatedAt,
+    bool? isArchived = false,
   }) async {
     final normalizedQuery = _searchIndexer.normalize(query);
-    final q = _db.select(_db.coffees)
-      ..where((tbl) => tbl.isArchived.equals(false));
+    final q = _db.select(_db.coffees);
+
+    if (isArchived != null) {
+      q.where((tbl) => tbl.isArchived.equals(isArchived));
+    }
 
     if (normalizedQuery.isNotEmpty) {
       q.where((tbl) => tbl.searchText.like('%$normalizedQuery%'));
@@ -657,17 +661,41 @@ class LocalSettingsRepository implements SettingsRepository {
   final AppDatabase _db;
 
   @override
-  Future<UnitSystem> getUnitSystem() async {
-    final v = await _db.getSetting('unit_system');
-    if (v == UnitSystem.imperial.name) {
-      return UnitSystem.imperial;
+  Future<WeightUnitSystem> getWeightUnitSystem() async {
+    final value = await _db.getSetting('weight_unit_system');
+    if (value == WeightUnitSystem.ounces.name) {
+      return WeightUnitSystem.ounces;
     }
-    return UnitSystem.metric;
+
+    final legacy = await _db.getSetting('unit_system');
+    if (legacy == UnitSystem.imperial.name) {
+      return WeightUnitSystem.ounces;
+    }
+    return WeightUnitSystem.grams;
   }
 
   @override
-  Future<void> setUnitSystem(UnitSystem unitSystem) {
-    return _db.upsertSetting('unit_system', unitSystem.name);
+  Future<void> setWeightUnitSystem(WeightUnitSystem unitSystem) {
+    return _db.upsertSetting('weight_unit_system', unitSystem.name);
+  }
+
+  @override
+  Future<TemperatureUnitSystem> getTemperatureUnitSystem() async {
+    final value = await _db.getSetting('temperature_unit_system');
+    if (value == TemperatureUnitSystem.fahrenheit.name) {
+      return TemperatureUnitSystem.fahrenheit;
+    }
+
+    final legacy = await _db.getSetting('unit_system');
+    if (legacy == UnitSystem.imperial.name) {
+      return TemperatureUnitSystem.fahrenheit;
+    }
+    return TemperatureUnitSystem.celsius;
+  }
+
+  @override
+  Future<void> setTemperatureUnitSystem(TemperatureUnitSystem unitSystem) {
+    return _db.upsertSetting('temperature_unit_system', unitSystem.name);
   }
 
   @override

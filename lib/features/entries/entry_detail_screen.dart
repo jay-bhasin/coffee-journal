@@ -30,11 +30,7 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
     final repository = ref.watch(entryRepositoryProvider);
     final coffeeRepository = ref.watch(coffeeRepositoryProvider);
     final templateRepository = ref.watch(templateRepositoryProvider);
-    final unitSystem = ref.watch(unitSystemProvider).maybeWhen(
-          data: (value) => value,
-          orElse: () => UnitSystem.metric,
-        );
-    final unitConverter = ref.watch(unitConverterProvider);
+    final displayFormatter = ref.watch(appDisplayFormatterProvider);
 
     return FutureBuilder<EntryRecord?>(
       key: ValueKey('entry-detail-${widget.entryId}-$_refreshToken'),
@@ -60,11 +56,7 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
             : SensoryNotes.fromJson(jsonDecode(entry.sensoryJson!) as Map<String, dynamic>);
         final brewTime = entry.brewTimeSecManual ?? entry.brewTimeSecAuto;
         final ratio = entry.coffeeDoseG <= 0 ? 0.0 : entry.waterTotalG / entry.coffeeDoseG;
-        final temperature = DisplayFormatters.formatTemperature(
-          entry.waterTempC,
-          unitSystem,
-          unitConverter,
-        );
+        final temperature = displayFormatter.formatTemperature(entry.waterTempC);
         final grinder = DisplayFormatters.formatGrinder(
           entry.grinder,
           entry.grindSetting,
@@ -236,12 +228,12 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
                     children: [
                       _InfoCard(
                         label: 'Coffee dose',
-                        value: DisplayFormatters.formatWeight(entry.coffeeDoseG),
+                        value: displayFormatter.formatWeight(entry.coffeeDoseG),
                         icon: const Icon(Icons.scale_outlined),
                       ),
                       _InfoCard(
                         label: 'Water amount',
-                        value: DisplayFormatters.formatWeight(entry.waterTotalG),
+                        value: displayFormatter.formatWeight(entry.waterTotalG),
                         icon: const Icon(Icons.water_drop_outlined),
                       ),
                       _InfoCard(
@@ -275,7 +267,7 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
                       if (entry.yieldG != null)
                         _InfoCard(
                           label: 'Yield',
-                          value: DisplayFormatters.formatWeight(entry.yieldG!),
+                          value: displayFormatter.formatWeight(entry.yieldG!),
                           icon: const Icon(Icons.local_drink_outlined),
                         ),
                       if (entry.pressureBar != null)
@@ -302,6 +294,7 @@ class _EntryDetailScreenState extends ConsumerState<EntryDetailScreen> {
                     steps: item.steps,
                     brewTime: brewTime,
                     isBlank: _isBlank,
+                    displayFormatter: displayFormatter,
                   ),
                   const Divider(height: 32),
                   _SectionTitle(title: 'Results'),
@@ -410,11 +403,13 @@ class _RecipeStepsSection extends StatefulWidget {
     required this.steps,
     required this.brewTime,
     required this.isBlank,
+    required this.displayFormatter,
   });
 
   final List<EntryStep> steps;
   final int brewTime;
   final bool Function(String?) isBlank;
+  final AppDisplayFormatter displayFormatter;
 
   @override
   State<_RecipeStepsSection> createState() => _RecipeStepsSectionState();
@@ -484,7 +479,7 @@ class _RecipeStepsSectionState extends State<_RecipeStepsSection> {
               isLast: !showEndStep && entryWithIndex.key == normalizedSteps.length - 1,
               startLabel: DisplayFormatters.formatDuration(step.startSec),
               waterLabel: hasWater
-                  ? DisplayFormatters.formatWeight(displayedWater)
+                  ? widget.displayFormatter.formatWeight(displayedWater)
                   : '',
             ),
             child: ListTile(
@@ -501,7 +496,7 @@ class _RecipeStepsSectionState extends State<_RecipeStepsSection> {
                     const Icon(Icons.water_drop_outlined, size: 18),
                     const SizedBox(width: 6),
                     Text(
-                      DisplayFormatters.formatWeight(displayedWater),
+                      widget.displayFormatter.formatWeight(displayedWater),
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ]
