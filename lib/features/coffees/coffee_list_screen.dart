@@ -146,9 +146,6 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen>
                   key: const PageStorageKey('coffee-list-current'),
                   title: 'Now Brewing',
                   coffees: data.currentCoffees,
-                  roasterCount: data.roasterCount,
-                  coffeeCount: data.coffeeCount,
-                  brewMethodCount: data.brewMethodCount,
                   sortLabel: _sortLabel(_sort),
                   query: _searchController.text.trim(),
                   onClearQuery: () {
@@ -183,9 +180,6 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen>
                   key: const PageStorageKey('coffee-list-archived'),
                   title: 'Archived',
                   coffees: data.archivedCoffees,
-                  roasterCount: data.roasterCount,
-                  coffeeCount: data.coffeeCount,
-                  brewMethodCount: data.brewMethodCount,
                   sortLabel: _sortLabel(_sort),
                   query: _searchController.text.trim(),
                   onClearQuery: () {
@@ -364,9 +358,6 @@ class _CoffeeListTab extends StatelessWidget {
     super.key,
     required this.title,
     required this.coffees,
-    required this.roasterCount,
-    required this.coffeeCount,
-    required this.brewMethodCount,
     required this.sortLabel,
     required this.query,
     required this.onClearQuery,
@@ -380,9 +371,6 @@ class _CoffeeListTab extends StatelessWidget {
 
   final String title;
   final List<CoffeeRecord> coffees;
-  final int roasterCount;
-  final int coffeeCount;
-  final int brewMethodCount;
   final String sortLabel;
   final String query;
   final VoidCallback onClearQuery;
@@ -400,31 +388,6 @@ class _CoffeeListTab extends StatelessWidget {
       key: PageStorageKey('coffee-tab-$title'),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: _MetricTile(
-                label: 'Roasters',
-                value: roasterCount.toString(),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _MetricTile(
-                label: 'Coffees',
-                value: coffeeCount.toString(),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _MetricTile(
-                label: 'Brew Methods',
-                value: brewMethodCount.toString(),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
         Row(
           children: [
             Text(
@@ -505,6 +468,9 @@ class _CoffeeListTab extends StatelessWidget {
   }
 }
 
+// Kept for a possible return of the global summary metrics; we are not currently
+// showing them and have not settled on the right placement in the home layout.
+// ignore: unused_element
 class _MetricTile extends StatelessWidget {
   const _MetricTile({required this.label, required this.value});
 
