@@ -102,6 +102,11 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen>
                       icon: const Icon(Icons.search),
                     ),
                     IconButton(
+                      tooltip: 'Recipe templates',
+                      onPressed: () => context.push('/templates'),
+                      icon: const Icon(Icons.description_outlined),
+                    ),
+                    IconButton(
                       tooltip: 'Settings',
                       onPressed: () => context.push('/settings'),
                       icon: const Icon(Icons.settings),

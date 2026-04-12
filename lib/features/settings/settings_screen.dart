@@ -107,14 +107,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               const Divider(height: 32),
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Recipe templates'),
-                subtitle: const Text('Create and manage recipe templates'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.push('/templates'),
-              ),
-              const Divider(height: 32),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
                 title: const Text('Backup & Restore'),
                 subtitle: const Text('Export or import app data'),
                 trailing: const Icon(Icons.chevron_right),
