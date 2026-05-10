@@ -8,12 +8,12 @@ Current product focuses on:
 - Entry journaling per coffee with recipe steps
 - Global recipe templates
 - Editable brew methods
-- Local backup/restore (JSON)
+- Local backup export + additive JSON import
 - Split settings for weight units, temperature units, and dark mode
 - Entry creation from blank or template
 
 ## Tech Stack
-- Flutter (Material 3)
+- Flutter `3.41.2` via `fvm` (Material 3)
 - `flutter_riverpod` (v3.x)
 - `go_router` (v17.x)
 - `drift` + `sqlite3_flutter_libs`
@@ -56,6 +56,7 @@ State providers:
 - `temperatureUnitSystemProvider`: `FutureProvider`
 - `appDisplayFormatterProvider`: Riverpod provider backed by the split unit settings + `UnitConverter`
 - `themeModeProvider`: Riverpod 3 `NotifierProvider` (`ThemeModeController extends Notifier<ThemeMode>`)
+- `appDataRevisionProvider`: Riverpod `NotifierProvider<int>` used to propagate global data refreshes after import
 
 Important logic:
 - Templates are normalized to **global only**
@@ -64,6 +65,10 @@ Important logic:
 - `TemplateRepository` now supports `getById(...)` for template editing and entry prefill
 - Backup import tolerates old numeric altitude values and normalizes them to text
 - Backup/import preserves `coffees.notes`, `entries.waterCondition`, and `coffees.isArchived`
+- Backup import is additive, not destructive:
+  - existing data is left in place
+  - imported records get new IDs
+  - logical duplicates are possible
 - `CoffeeRecord` includes a derived nullable `lastEntryAt` sourced from the latest `entries.brewAt`
 - Coffee list `updatedAt` sort option is presented as **Recent activity** and orders by:
   - latest `lastEntryAt` when a coffee has entries
@@ -98,20 +103,17 @@ Screens:
 - Archive/restore is controlled from the coffee-card overflow menu, not the coffee edit form.
 
 ## Dependency State (Latest Update)
-- Ran:
-  1. `flutter pub upgrade`
-  2. `flutter pub upgrade --major-versions`
-- Key direct dependency upgrades:
-  - `flutter_riverpod`: `2.6.1 -> 3.2.1`
-  - `go_router`: `16.3.0 -> 17.1.0`
-  - `sqlite3_flutter_libs`: `0.5.42 -> 0.6.0+eol`
-  - `build_runner`: `2.11.1 -> 2.12.2`
-- Compatibility changes applied:
-  - Replaced legacy Riverpod `StateNotifierProvider` usage for theme mode with `NotifierProvider`
-  - Replaced `AsyncValue.valueOrNull` call sites with `maybeWhen(...)` pattern
-- Post-upgrade validation:
-  - `flutter analyze` passes
-  - `flutter test` passes
+- Repo is pinned to `Flutter 3.41.2` using `fvm`
+- Current notable direct dependencies include:
+  - `flutter_riverpod` `3.2.1`
+  - `go_router` `17.1.0`
+  - `sqlite3_flutter_libs` `0.6.0+eol`
+  - `share_plus` `13.1.0`
+  - `file_picker` `12.0.0-beta.1`
+- Current `file_picker` note:
+  - beta version is intentional
+  - avoids Android/AGP incompatibility from legacy `file_picker 3.x`
+  - resolves a package-graph conflict with `share_plus` that blocked stable `file_picker 11.x`
 
 ## Generated File Notes
 - After dependency upgrades, Flutter regenerated plugin registrant files for desktop targets.
@@ -129,9 +131,16 @@ Settings screen currently provides:
 - Temperature units (`°C` / `°F`)
 - Dark mode toggle
 - Manage brew methods
-- Backup/restore navigation
+- Backup/import navigation
 
 Backup/import UI is in dedicated `BackupScreen`.
+
+Backup/import screen behavior:
+- Export uses `share_plus` and the device share sheet
+- Import uses `file_picker` to select a JSON export file
+- UI intentionally says `Import data`, not `Restore`
+- Import preview warns that existing data is not replaced
+- Successful import bumps `appDataRevisionProvider`, so data-driven screens refresh without restarting the app
 
 ## Entry Editing/Display Behavior
 ### Entry form
@@ -315,6 +324,7 @@ test/
 
 ## Validation Workflow
 Use after changes:
-1. `dart run build_runner build --delete-conflicting-outputs` (when schema/model changes)
-2. `flutter analyze`
-3. `flutter test`
+1. `fvm flutter pub get`
+2. `dart run build_runner build --delete-conflicting-outputs` (when schema/model changes)
+3. `fvm flutter analyze`
+4. `fvm flutter test`

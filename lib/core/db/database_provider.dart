@@ -83,6 +83,10 @@ final themeModeProvider = NotifierProvider<ThemeModeController, ThemeMode>(
   ThemeModeController.new,
 );
 
+final appDataRevisionProvider = NotifierProvider<AppDataRevisionController, int>(
+  AppDataRevisionController.new,
+);
+
 class ThemeModeController extends Notifier<ThemeMode> {
   bool _initialized = false;
 
@@ -105,5 +109,14 @@ class ThemeModeController extends Notifier<ThemeMode> {
   Future<void> setDarkModeEnabled(bool enabled) async {
     state = enabled ? ThemeMode.dark : ThemeMode.light;
     await _settingsRepository.setDarkModeEnabled(enabled);
+  }
+}
+
+class AppDataRevisionController extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void bump() {
+    state++;
   }
 }

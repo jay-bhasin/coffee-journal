@@ -21,6 +21,7 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen>
   CoffeeSortOption _sort = CoffeeSortOption.updatedAt;
   bool _showSearch = false;
   bool _showArchived = false;
+  int _lastSeenDataRevision = 0;
   late final TabController _tabController;
   late Future<_HomeData> _homeDataFuture;
 
@@ -44,7 +45,13 @@ class _CoffeeListScreenState extends ConsumerState<CoffeeListScreen>
 
   @override
   Widget build(BuildContext context) {
+    final dataRevision = ref.watch(appDataRevisionProvider);
     final repository = ref.watch(coffeeRepositoryProvider);
+
+    if (_lastSeenDataRevision != dataRevision) {
+      _lastSeenDataRevision = dataRevision;
+      _homeDataFuture = _buildHomeDataFuture();
+    }
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(

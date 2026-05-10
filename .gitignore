@@ -24,6 +24,8 @@ testing/
 # is commented out by default.
 #.vscode/
 
+# FVM local SDK artifacts
+
 # Flutter/Dart/Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id
@@ -45,3 +47,6 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 .ruby-version
+
+# FVM Version Cache
+.fvm/

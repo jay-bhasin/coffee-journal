@@ -22,6 +22,7 @@ class _BrewMethodsScreenState extends ConsumerState<BrewMethodsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(appDataRevisionProvider);
     final repository = ref.watch(brewMethodRepositoryProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Brew methods')),

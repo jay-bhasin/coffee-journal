@@ -34,6 +34,7 @@ class _TemplatesScreenState extends ConsumerState<TemplatesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(appDataRevisionProvider);
     final templateRepo = ref.watch(templateRepositoryProvider);
     final displayFormatter = ref.watch(appDisplayFormatterProvider);
     final scaler = ref.watch(recipeScalerProvider);

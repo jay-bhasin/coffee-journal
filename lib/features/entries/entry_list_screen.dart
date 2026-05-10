@@ -25,6 +25,7 @@ class _EntryListScreenState extends ConsumerState<EntryListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(appDataRevisionProvider);
     final coffeeRepository = ref.watch(coffeeRepositoryProvider);
     final entryRepository = ref.watch(entryRepositoryProvider);
     final templateRepository = ref.watch(templateRepositoryProvider);
