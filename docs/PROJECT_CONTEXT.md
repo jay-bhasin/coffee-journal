@@ -9,7 +9,7 @@ Current product focuses on:
 - Global recipe templates
 - Editable brew methods
 - Local backup/restore (JSON)
-- Settings for units + dark mode
+- Split settings for weight units, temperature units, and dark mode
 - Entry creation from blank or template
 
 ## Tech Stack
@@ -29,12 +29,14 @@ Key tables:
 - `app_settings`
 - `brew_methods`
 
-Schema version: **3**.
+Schema version: **4**.
 
 Notable migration behavior:
 - Adds `brew_methods`
 - Migrates legacy brew-method names (`other`/`Other`) to `Unspecified`
 - Converts `coffees.altitude_m` from numeric (`REAL`) to text (`TEXT`) while preserving existing values
+- Adds `coffees.notes`
+- Adds `entries.water_condition`
 
 ## Repository Layer
 Contracts and implementations:
@@ -50,7 +52,9 @@ Main repositories:
 - `BackupRepository`
 
 State providers:
-- `unitSystemProvider`: `FutureProvider`
+- `weightUnitSystemProvider`: `FutureProvider`
+- `temperatureUnitSystemProvider`: `FutureProvider`
+- `appDisplayFormatterProvider`: Riverpod provider backed by the split unit settings + `UnitConverter`
 - `themeModeProvider`: Riverpod 3 `NotifierProvider` (`ThemeModeController extends Notifier<ThemeMode>`)
 
 Important logic:
@@ -59,6 +63,7 @@ Important logic:
 - Backup includes brew methods
 - `TemplateRepository` now supports `getById(...)` for template editing and entry prefill
 - Backup import tolerates old numeric altitude values and normalizes them to text
+- Backup/import preserves `coffees.notes`, `entries.waterCondition`, and `coffees.isArchived`
 - `CoffeeRecord` includes a derived nullable `lastEntryAt` sourced from the latest `entries.brewAt`
 - Coffee list `updatedAt` sort option is presented as **Recent activity** and orders by:
   - latest `lastEntryAt` when a coffee has entries
@@ -88,7 +93,9 @@ Screens:
 - Entry detail menu mirrors entry list menu actions.
 - New entry flow on entry list FAB is a chooser:
   - Blank entry
-  - From template (template picker + prefilled entry form)
+  - From template (full templates screen in picker mode + prefilled entry form)
+- Home coffee catalog is split into `Now Brewing` and `Archived` tabs.
+- Archive/restore is controlled from the coffee-card overflow menu, not the coffee edit form.
 
 ## Dependency State (Latest Update)
 - Ran:
@@ -118,10 +125,10 @@ Screens:
 
 ## Settings
 Settings screen currently provides:
-- Unit system (metric/imperial)
+- Weight units (`g` / `oz`)
+- Temperature units (`°C` / `°F`)
 - Dark mode toggle
 - Manage brew methods
-- Recipe templates navigation
 - Backup/restore navigation
 
 Backup/import UI is in dedicated `BackupScreen`.
@@ -139,6 +146,7 @@ Backup/import UI is in dedicated `BackupScreen`.
   - Duplicate source entry
   - Template (`templateId` query param)
 - Brew timestamp picker edits both date and time.
+- Water condition is a free-text field on entries.
 - Dose / water / ratio now use a tri-lock model:
   - exactly one of `dose`, `water`, or `ratio` is locked at a time
   - locked field is read-only
@@ -164,6 +172,7 @@ Backup/import UI is in dedicated `BackupScreen`.
 ### Entry list
 - Filters/sort panel toggled from app bar.
 - Top header includes a shared coffee summary card widget.
+- Coffee summary card on this screen can reveal coffee notes inline via a notes icon when notes exist.
 - Header shows entry count + sort chip + active method filter chip.
 - Entry card formatting:
   - Brew method shown as chip
@@ -207,36 +216,46 @@ Applied in entry list/detail:
 - Shared display formatting now lives in `lib/core/utils/display_formatters.dart`
 - Temperature: `<number> °C` or `<number> °F`
 - Time: `mm:ss`
-- Weight: `<number> g`
+- Weight: metric `<number> g`, imperial `<number> oz`
 - Grinder: `GrindSize (Grinder)` when both exist
 - Pressure and extraction-outcome labels are also formatted from the shared display formatter
+- Unit-sensitive formatting is routed through `AppDisplayFormatter`, which is provider-backed and reads the split weight/temperature settings.
 
 ## Home Screen Aesthetic State
 Home screen currently includes:
-- `SliverAppBar.large`
-- Search toggle in app bar
-- Compact metrics strip under search/title showing:
-  - distinct roaster count
-  - total coffee count
-  - distinct brew method count
-- Metrics tile layout: label above number
-- Section header: `All Coffees (N)` + sort chip
+- `NestedScrollView` with a pinned `SliverAppBar`
+- Search toggle in app bar with inline search field state
+- `TabBar` in the app bar for:
+  - `Now Brewing`
+  - `Archived`
+- Horizontal swipe between the two tabs via `TabBarView`
+- Section header count is tab-specific (`Now Brewing` or `Archived`)
 - Sort label `Recent activity` maps to derived coffee activity, not just coffee-record edits
-- Active context chips (search only)
 - Coffee card metadata chip now combines location as `Region, Country`
 - Coffee card metadata chips: `Region, Country`, `Varietal`, `Process`
 - Altitude is shown as plain text metadata (not a chip)
 - Tasting notes appear above tag text and use a slightly larger text style (`bodyMedium`)
 - Coffee cards show `Last entry <date>` only when the coffee has at least one entry
+- Templates navigation lives in the home app bar as its own icon button between search and settings
 - Shared coffee summary card matches the home card typography for name/roaster and shows the full coffee metadata set:
   - chips: `Region, Country`, `Varietal`, `Process`
-  - supporting lines: farm, producer, altitude, roast date, tags
+  - supporting lines: farm, producer, altitude, roast date, tags, notes
   - tasting notes as body text
 
-## Known UX Rationale
-- No avatar circles on coffee tiles (avoids decorative clutter).
-- Hero strip retained only where metrics are meaningful and compact.
-- Dense chips used selectively to keep information readable on mobile.
+Note:
+- The old summary-metrics widget code is intentionally still present in the home screen file as a possible future return point, but it is not currently rendered because placement is unresolved.
+
+## Templates Screen State
+- `TemplatesScreen` supports both:
+  - normal management mode
+  - picker mode (`/templates?picker=1`) for selecting a template while creating a new entry
+- Picker mode hides the add FAB, changes the title to `Choose template`, and tapping a template returns its ID to the caller.
+- Templates screen now has the same in-app-bar search pattern as the coffee list screen.
+- Template cards currently stay as `ListTile`-style cards with:
+  - bold title
+  - leading step-count avatar
+  - subtitle showing brew method, formatted dose/water, and ratio
+  - overflow menu actions in management mode: edit, duplicate, delete
 
 ## Current Structure
 ```text
