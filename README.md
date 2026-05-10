@@ -54,6 +54,7 @@ Prerequisites:
 - an Apple ID signed into Xcode
 - an iPhone connected by cable for first-time setup
 - `fvm` installed
+- iOS 14 or newer on the target device/simulator
 
 Steps:
 
